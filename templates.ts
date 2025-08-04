@@ -64,7 +64,7 @@ Base-toi uniquement sur le contenu du document fourni.`
     category: 'academic',
     parameters: {
       generationType: 'revision_sheet',
-      complexity: 'Basique',
+
       targetAudience: 'Étudiants',
       customInstructions: 'Crée une fiche de cours structurée avec : 1) Résumé concis, 2) Concepts clés avec définitions, 3) Idées principales, 4) Questions de réflexion pour approfondir.',
       focus: 'Organisation et mémorisation'
@@ -82,7 +82,7 @@ Base-toi uniquement sur le contenu du document fourni.`
     category: 'professional',
     parameters: {
       generationType: 'summary',
-      complexity: 'Avancé',
+
       targetAudience: 'Professionnels',
       customInstructions: 'Crée un résumé professionnel avec : 1) Points clés, 2) Implications pratiques, 3) Recommandations d\'action, 4) Prochaines étapes.',
       focus: 'Action et application pratique'
@@ -126,7 +126,6 @@ Base-toi sur le contenu du document pour fournir une analyse personnalisée et a
     category: 'professional',
     parameters: {
       generationType: 'summary',
-      complexity: 'Intermédiaire',
       targetAudience: 'Professionnels',
       customInstructions: 'Crée un compte-rendu de réunion avec : 1) Participants et ordre du jour, 2) Points discutés, 3) Décisions prises, 4) Actions à suivre avec responsables.',
       focus: 'Organisation et suivi des actions'
@@ -144,7 +143,6 @@ Base-toi sur le contenu du document pour fournir une analyse personnalisée et a
     category: 'professional',
     parameters: {
       generationType: 'mind_map',
-      complexity: 'Intermédiaire',
       targetAudience: 'Chefs de projet',
       customInstructions: 'Crée une carte mentale de planification avec : 1) Objectifs du projet, 2) Étapes principales, 3) Ressources nécessaires, 4) Échéances clés.',
       focus: 'Organisation et planification'
@@ -162,7 +160,6 @@ Base-toi sur le contenu du document pour fournir une analyse personnalisée et a
     category: 'academic',
     parameters: {
       generationType: 'mind_map',
-      complexity: 'Intermédiaire',
       targetAudience: 'Apprenants visuels',
       customInstructions: 'Crée une carte mentale avec un concept central et des branches principales organisées logiquement. Chaque nœud doit être concis et clair.',
       focus: 'Organisation visuelle et logique'
@@ -182,7 +179,6 @@ Base-toi sur le contenu du document pour fournir une analyse personnalisée et a
       generationType: 'guided_study',
       numQuestions: 5,
       difficulty: 'Moyen',
-      complexity: 'Intermédiaire',
       targetAudience: 'Étudiants autonomes',
       customInstructions: 'Crée un parcours d\'étude guidé avec : 1) Résumé structuré, 2) QCM de vérification, 3) Chat pour approfondir les points difficiles.',
       focus: 'Apprentissage progressif et interactif'

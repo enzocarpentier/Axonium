@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    
+    // Règles pour les utilisateurs (permettre la création par les admins)
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Permettre la création pour les comptes approuvés
+      allow create: if true;
+      allow update: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Règles pour les sessions (utilisateurs authentifiés uniquement)
+    match /sessions/{document} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Règles pour les paramètres utilisateur (utilisateurs authentifiés uniquement)
+    match /userSettings/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Règles pour les clés API (utilisateurs authentifiés uniquement)
+    match /apiKeys/{document} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Règles pour les templates (utilisateurs authentifiés uniquement)
+    match /templates/{document} {
+      allow read, write: if request.auth != null && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.isPublic == true
+      );
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Règles pour les brouillons (utilisateurs authentifiés uniquement)
+    match /drafts/{document} {
+      allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Règles pour les sessions partagées (utilisateurs authentifiés uniquement)
+    match /sharedSessions/{document} {
+      allow read, write: if request.auth != null;
+    }
+  }
+} 

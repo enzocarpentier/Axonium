@@ -1,12 +1,16 @@
 
 import { GoogleGenAI, Type, GenerateContentResponse, Chat, Content } from "@google/genai";
 import type { QuizData, RevisionSheetData, Message, MindMapData } from '../types.ts';
+import apiKeyService from './apiKeyService.ts';
 
-if (!process.env.API_KEY) {
-    throw new Error("La variable d'environnement API_KEY n'est pas définie.");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Fonction pour obtenir l'instance Gemini avec la clé API de l'utilisateur
+const getGeminiInstance = async (userId: string) => {
+    const apiKey = await apiKeyService.getApiKey(userId);
+    if (!apiKey) {
+        throw new Error("Aucune clé API Gemini configurée. Veuillez configurer votre clé API dans les paramètres.");
+    }
+    return new GoogleGenAI({ apiKey });
+};
 
 const quizSchema = {
     type: Type.OBJECT,
@@ -140,8 +144,9 @@ const shuffleArray = <T>(array: T[]): T[] => {
 };
 
 
-export const generateQuizFromText = async (documentText: string, numQuestions: number, difficulty: string, customPrompt?: string): Promise<QuizData> => {
+export const generateQuizFromText = async (documentText: string, numQuestions: number, difficulty: string, userId: string, customPrompt?: string): Promise<QuizData> => {
     try {
+        const ai = await getGeminiInstance(userId);
         const prompt = customPrompt || `À partir du texte suivant, génère un questionnaire à choix multiples (QCM) de ${numQuestions} questions avec un niveau de difficulté '${difficulty}'. Le QCM doit évaluer la compréhension des concepts clés du texte. Assure-toi que les questions correspondent bien au niveau de difficulté demandé. IMPORTANT : L'intégralité du QCM (titre, questions, options, justifications) DOIT être rédigée exclusivement en français, quelle que soit la langue du texte source. Voici le texte : \n\n---DEBUT DU TEXTE---\n${documentText}\n---FIN DU TEXTE---`;
 
         const response: GenerateContentResponse = await ai.models.generateContent({
@@ -181,8 +186,9 @@ export const generateQuizFromText = async (documentText: string, numQuestions: n
     }
 };
 
-export const generateSummaryFromText = async (documentText: string, customPrompt?: string): Promise<string> => {
+export const generateSummaryFromText = async (documentText: string, userId: string, customPrompt?: string): Promise<string> => {
     try {
+        const ai = await getGeminiInstance(userId);
         const prompt = customPrompt || `À partir du texte suivant, rédige un résumé concis en 3 à 5 points clés, sous forme de liste à puces. Chaque point doit mettre en évidence une idée ou un concept majeur du document. Le résumé doit être entièrement en français, même si le texte source est dans une autre langue. Voici le texte : \n\n---DEBUT DU TEXTE---\n${documentText}\n---FIN DU TEXTE---`;
 
         const response: GenerateContentResponse = await ai.models.generateContent({
@@ -206,8 +212,9 @@ export const generateSummaryFromText = async (documentText: string, customPrompt
     }
 };
 
-export const generateRevisionSheetFromText = async (documentText: string, customPrompt?: string): Promise<RevisionSheetData> => {
+export const generateRevisionSheetFromText = async (documentText: string, userId: string, customPrompt?: string): Promise<RevisionSheetData> => {
     try {
+        const ai = await getGeminiInstance(userId);
         const prompt = customPrompt || `À partir du texte suivant, génère une fiche de révision complète et structurée. La fiche doit être entièrement en français. Voici le texte : \n\n---DEBUT DU TEXTE---\n${documentText}\n---FIN DU TEXTE---`;
 
         const response: GenerateContentResponse = await ai.models.generateContent({
@@ -237,8 +244,9 @@ export const generateRevisionSheetFromText = async (documentText: string, custom
     }
 };
 
-export const generateMindMapFromText = async (documentText: string): Promise<MindMapData> => {
+export const generateMindMapFromText = async (documentText: string, userId: string): Promise<MindMapData> => {
     try {
+        const ai = await getGeminiInstance(userId);
         const prompt = `À partir du texte suivant, génère les données pour une carte mentale (mind map) concise qui ne contient que les informations les plus importantes. Identifie un sujet central, 3 à 5 grandes idées, et pour chaque grande idée, quelques concepts clés associés. La structure doit être hiérarchique mais strictement limitée à deux niveaux de profondeur sous le sujet central (Sujet -> Idée Principale -> Concept Clé). La carte mentale doit être entièrement en français. Voici le texte : \n\n---DEBUT DU TEXTE---\n${documentText}\n---FIN DU TEXTE---`;
 
         const response: GenerateContentResponse = await ai.models.generateContent({
@@ -268,8 +276,9 @@ export const generateMindMapFromText = async (documentText: string): Promise<Min
     }
 };
 
-export const extractTextFromImage = async (base64Data: string, mimeType: string): Promise<string> => {
+export const extractTextFromImage = async (base64Data: string, mimeType: string, userId: string): Promise<string> => {
     try {
+        const ai = await getGeminiInstance(userId);
         const imagePart = {
             inlineData: {
                 data: base64Data,
@@ -303,8 +312,10 @@ export const continueChat = async (
     history: Message[], 
     newMessage: string, 
     documentText: string, 
-    useWebSearch: boolean
+    useWebSearch: boolean,
+    userId: string
 ): Promise<GenerateContentResponse> => {
+    const ai = await getGeminiInstance(userId);
     const apiHistory: Content[] = history.map(msg => ({
         role: msg.role,
         parts: [{ text: msg.text }]
@@ -335,7 +346,8 @@ export const getChatSystemInstruction = (documentText: string, useWebSearch: boo
     return `${instructionPrefix} Tes réponses doivent être entièrement en français. Voici le document de référence : \n\n---DEBUT DU DOCUMENT---\n${documentText}\n---FIN DU DOCUMENT---`;
 };
 
-export const startChatSession = (documentText: string, history: Message[] = []): Chat => {
+export const startChatSession = async (documentText: string, userId: string, history: Message[] = []): Promise<Chat> => {
+    const ai = await getGeminiInstance(userId);
     const apiHistory: Content[] = history.map(msg => ({
         role: msg.role,
         parts: [{ text: msg.text }]

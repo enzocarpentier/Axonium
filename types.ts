@@ -116,3 +116,83 @@ export interface GuidedStudySession extends SessionBase {
 }
 
 export type Session = QcmSession | SummarySession | ChatSession | RevisionSheetSession | MindMapSession | GuidedStudySession;
+
+// Types pour les paramètres utilisateur
+export interface UserPreferences {
+  // Préférences de génération
+  defaultGenerationType: GenerationType;
+  defaultNumQuestions: number;
+  defaultDifficulty: 'Facile' | 'Moyen' | 'Difficile';
+  defaultLanguage: 'fr' | 'en';
+  
+  // Préférences d'affichage
+  theme: 'light' | 'dark' | 'auto';
+  fontSize: 'small' | 'medium' | 'large';
+  compactMode: boolean;
+  
+  // Préférences de notifications
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  notificationSound: boolean;
+  
+  // Préférences de contenu
+  autoSave: boolean;
+  autoSaveInterval: number; // en minutes
+  exportFormat: 'pdf' | 'txt' | 'docx';
+  
+  // Préférences avancées
+  aiModel: 'gemini' | 'gpt';
+  maxTokens: number;
+  temperature: number;
+}
+
+export interface UserSettings {
+  id: string;
+  userId: string;
+  preferences: UserPreferences;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Types pour le système de partage
+export interface SharePermission {
+  id: string;
+  sessionId: string;
+  sharedByUserId: string;
+  sharedWithUserId: string;
+  permission: 'read' | 'write' | 'admin';
+  createdAt: string;
+  expiresAt?: string; // Optionnel pour les partages temporaires
+}
+
+export interface PublicShare {
+  id: string;
+  sessionId: string;
+  sharedByUserId: string;
+  publicLink: string;
+  isActive: boolean;
+  createdAt: string;
+  expiresAt?: string;
+  accessCount: number;
+}
+
+export interface ShareInvitation {
+  id: string;
+  sessionId: string;
+  sharedByUserId: string;
+  sharedWithEmail: string;
+  permission: 'read' | 'write' | 'admin';
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: string;
+  expiresAt: string; // 7 jours par défaut
+}
+
+// Extension des sessions pour inclure les informations de partage
+export interface SessionWithSharing extends Session {
+  isShared?: boolean;
+  sharedBy?: string;
+  sharePermissions?: SharePermission[];
+  publicShare?: PublicShare;
+}
+
+// Types pour le système de demandes d'inscription

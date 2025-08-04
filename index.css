@@ -1,0 +1,968 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Configuration du mode sombre */
+@layer base {
+  html {
+    @apply transition-colors duration-300;
+  }
+  
+  body {
+    @apply transition-colors duration-300;
+  }
+}
+
+/* Styles personnalisés pour le mode sombre */
+@layer components {
+  .dark {
+    color-scheme: dark;
+  }
+  
+  /* Styles de base pour le mode sombre */
+  .dark body {
+    @apply bg-slate-900 text-white;
+  }
+  
+  .dark .bg-white {
+    @apply bg-slate-800;
+  }
+  
+  .dark .text-slate-900 {
+    @apply text-white;
+  }
+  
+  .dark .text-slate-600 {
+    @apply text-slate-300;
+  }
+  
+  .dark .text-slate-500 {
+    @apply text-slate-400;
+  }
+  
+  .dark .border-slate-200 {
+    @apply border-slate-700;
+  }
+  
+  .dark .bg-slate-50 {
+    @apply bg-slate-900;
+  }
+  
+  .dark .bg-slate-100 {
+    @apply bg-slate-800;
+  }
+  
+  /* Styles spécifiques pour les composants */
+  .dark .bg-gradient-to-br {
+    @apply from-slate-700 to-slate-600;
+  }
+  
+  .dark .bg-gradient-to-r {
+    @apply from-slate-700 to-slate-600;
+  }
+  
+  .dark .hover\:bg-slate-200:hover {
+    @apply hover:bg-slate-700;
+  }
+  
+  .dark .hover\:bg-slate-100:hover {
+    @apply hover:bg-slate-700;
+  }
+  
+  .dark .border-slate-300 {
+    @apply border-slate-600;
+  }
+  
+  .dark .bg-slate-50 {
+    @apply bg-slate-900;
+  }
+  
+  .dark .text-slate-800 {
+    @apply text-white;
+  }
+  
+  .dark .text-slate-700 {
+    @apply text-slate-200;
+  }
+} 
+
+/* Styles pour le mode compact */
+.compact-mode .p-4 {
+  padding: 0.5rem;
+}
+
+.compact-mode .p-6 {
+  padding: 1rem;
+}
+
+.compact-mode .p-8 {
+  padding: 1.5rem;
+}
+
+.compact-mode .gap-4 {
+  gap: 0.75rem;
+}
+
+.compact-mode .gap-6 {
+  gap: 1rem;
+}
+
+.compact-mode .space-y-4 > * + * {
+  margin-top: 0.75rem;
+}
+
+.compact-mode .space-y-6 > * + * {
+  margin-top: 1rem;
+}
+
+.compact-mode .text-lg {
+  font-size: 1rem;
+}
+
+.compact-mode .text-xl {
+  font-size: 1.125rem;
+}
+
+.compact-mode .text-2xl {
+  font-size: 1.25rem;
+}
+
+.compact-mode .text-3xl {
+  font-size: 1.5rem;
+}
+
+/* Styles pour les préférences de taille de police */
+.text-sm {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.text-base {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.text-lg {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+
+/* Animations pour les transitions de préférences */
+.preferences-transition {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Animations personnalisées pour les transitions de page */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Classes d'animation */
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s ease-out forwards;
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.6s ease-out forwards;
+}
+
+/* Transitions fluides pour les sections */
+.section-transition {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.section-transition-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.section-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.section-transition-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.section-transition-exit-active {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
+/* Animations pour les cartes */
+.card-animate {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-animate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Animations pour les boutons */
+.button-animate {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.button-animate:hover {
+  transform: translateY(-1px);
+}
+
+.button-animate:active {
+  transform: translateY(0);
+}
+
+/* Animations pour les modals */
+.modal-animate {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modal-backdrop {
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* Support pour prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Animations avancées pour les spinners élégants */
+@keyframes wave {
+  0%, 40%, 100% {
+    transform: scaleY(0.4);
+  }
+  20% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes orbit {
+  0% {
+    transform: translateX(-50%) rotate(0deg);
+  }
+  100% {
+    transform: translateX(-50%) rotate(360deg);
+  }
+}
+
+@keyframes cube {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes morph {
+  0%, 100% {
+    border-radius: 50%;
+  }
+  50% {
+    border-radius: 25%;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 5px currentColor;
+  }
+  50% {
+    box-shadow: 0 0 20px currentColor, 0 0 30px currentColor;
+  }
+}
+
+/* Classes d'animation pour les spinners */
+.animate-wave {
+  animation: wave 1.2s ease-in-out infinite;
+}
+
+.animate-orbit {
+  animation: orbit 2s linear infinite;
+}
+
+.animate-cube {
+  animation: cube 1.5s ease-in-out infinite;
+}
+
+.animate-morph {
+  animation: morph 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 2s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+/* Spinners spécialisés */
+.spinner-gradient {
+  background: linear-gradient(45deg, #6366f1, #8b5cf6, #06b6d4);
+  background-size: 200% 200%;
+  animation: gradient-shift 2s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Spinner avec effet de particules */
+.spinner-particles {
+  position: relative;
+}
+
+.spinner-particles::before,
+.spinner-particles::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: currentColor;
+  animation: particle-pulse 2s ease-in-out infinite;
+}
+
+.spinner-particles::after {
+  animation-delay: 1s;
+}
+
+@keyframes particle-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.8;
+  }
+}
+
+/* Spinner avec effet de rotation 3D */
+.spinner-3d {
+  transform-style: preserve-3d;
+  animation: rotate-3d 2s linear infinite;
+}
+
+@keyframes rotate-3d {
+  0% {
+    transform: rotateX(0deg) rotateY(0deg);
+  }
+  100% {
+    transform: rotateX(360deg) rotateY(360deg);
+  }
+}
+
+/* Styles pour les toggles de préférences */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e1;
+  transition: 0.3s;
+  border-radius: 24px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+  background-color: #6366f1;
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+/* Styles pour les sliders de préférences */
+.range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 4px;
+  background: #e2e8f0;
+  outline: none;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.range-slider:hover {
+  opacity: 1;
+}
+
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #6366f1;
+  cursor: pointer;
+}
+
+.range-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #6366f1;
+  cursor: pointer;
+  border: none;
+}
+
+/* Styles pour les cartes de préférences */
+.preferences-card {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.preferences-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.dark .preferences-card {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  border-color: #475569;
+}
+
+/* Styles pour les badges de préférences */
+.preference-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.preference-badge.active {
+  background-color: #6366f1;
+  color: white;
+}
+
+.preference-badge:not(.active) {
+  background-color: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.dark .preference-badge:not(.active) {
+  background-color: #334155;
+  color: #cbd5e1;
+  border-color: #475569;
+}
+
+/* Styles pour les sections de préférences */
+.preferences-section {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e2e8f0;
+}
+
+.dark .preferences-section {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  border-color: #475569;
+}
+
+/* Styles pour les titres de sections */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 1.5rem;
+}
+
+.dark .section-title {
+  color: #f1f5f9;
+}
+
+/* Styles pour les descriptions de préférences */
+.preference-description {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+}
+
+.dark .preference-description {
+  color: #94a3b8;
+}
+
+/* Styles pour les groupes de préférences */
+.preference-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.preference-group:last-child {
+  border-bottom: none;
+}
+
+.dark .preference-group {
+  border-bottom-color: #475569;
+}
+
+/* Styles pour les labels de préférences */
+.preference-label {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.dark .preference-label {
+  color: #f1f5f9;
+}
+
+/* Styles pour les inputs de préférences */
+.preference-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: white;
+  color: #1e293b;
+  transition: all 0.2s ease;
+}
+
+.preference-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.dark .preference-input {
+  background-color: #334155;
+  border-color: #475569;
+  color: #f1f5f9;
+}
+
+.dark .preference-input:focus {
+  border-color: #6366f1;
+}
+
+/* Styles pour les selects de préférences */
+.preference-select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: white;
+  color: #1e293b;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.preference-select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.dark .preference-select {
+  background-color: #334155;
+  border-color: #475569;
+  color: #f1f5f9;
+}
+
+.dark .preference-select:focus {
+  border-color: #6366f1;
+}
+
+/* Styles pour les boutons de préférences */
+.preference-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.preference-button.primary {
+  background-color: #6366f1;
+  color: white;
+}
+
+.preference-button.primary:hover {
+  background-color: #5855eb;
+}
+
+.preference-button.secondary {
+  background-color: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.preference-button.secondary:hover {
+  background-color: #e2e8f0;
+  color: #475569;
+}
+
+.dark .preference-button.secondary {
+  background-color: #334155;
+  color: #cbd5e1;
+  border-color: #475569;
+}
+
+.dark .preference-button.secondary:hover {
+  background-color: #475569;
+  color: #f1f5f9;
+}
+
+/* Styles pour les icônes de préférences */
+.preference-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #6366f1;
+}
+
+/* Styles pour les notifications de préférences */
+.preferences-notification {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1000;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  background-color: #10b981;
+  color: white;
+  font-weight: 500;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+}
+
+.preferences-notification.show {
+  transform: translateX(0);
+}
+
+/* Styles pour les modales de préférences */
+.preferences-modal {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.preferences-modal-content {
+  background-color: white;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+  max-width: 800px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+.dark .preferences-modal-content {
+  background-color: #1e293b;
+}
+
+/* Styles pour les onglets de préférences */
+.preferences-tabs {
+  display: flex;
+  border-bottom: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
+.dark .preferences-tabs {
+  border-bottom-color: #475569;
+  background-color: #334155;
+}
+
+.preferences-tab {
+  flex: 1;
+  padding: 1rem 1.5rem;
+  text-align: center;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.preferences-tab:hover {
+  color: #1e293b;
+  background-color: #f1f5f9;
+}
+
+.preferences-tab.active {
+  color: #6366f1;
+  border-bottom-color: #6366f1;
+  background-color: white;
+}
+
+.dark .preferences-tab {
+  color: #94a3b8;
+}
+
+.dark .preferences-tab:hover {
+  color: #f1f5f9;
+  background-color: #475569;
+}
+
+.dark .preferences-tab.active {
+  color: #6366f1;
+  background-color: #1e293b;
+}
+
+/* Styles pour le contenu des onglets */
+.preferences-tab-content {
+  padding: 2rem;
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+/* Styles pour le footer des préférences */
+.preferences-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem 2rem;
+  border-top: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
+.dark .preferences-footer {
+  border-top-color: #475569;
+  background-color: #334155;
+}
+
+/* Styles pour les indicateurs de changement */
+.changes-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  background-color: #fef3c7;
+  color: #92400e;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.dark .changes-indicator {
+  background-color: #451a03;
+  color: #fbbf24;
+}
+
+/* Styles pour les boutons d'action */
+.action-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.action-button.primary {
+  background-color: #6366f1;
+  color: white;
+}
+
+.action-button.primary:hover {
+  background-color: #5855eb;
+}
+
+.action-button.primary:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.action-button.secondary {
+  background-color: transparent;
+  color: #64748b;
+  border: 1px solid #d1d5db;
+}
+
+.action-button.secondary:hover {
+  background-color: #f1f5f9;
+  color: #475569;
+}
+
+.dark .action-button.secondary {
+  color: #94a3b8;
+  border-color: #475569;
+}
+
+.dark .action-button.secondary:hover {
+  background-color: #475569;
+  color: #f1f5f9;
+}
+
+/* Styles pour les spinners de chargement */
+.loading-spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Styles pour les messages d'état */
+.status-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.status-message.success {
+  background-color: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.status-message.error {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.dark .status-message.success {
+  background-color: #064e3b;
+  color: #6ee7b7;
+  border-color: #059669;
+}
+
+.dark .status-message.error {
+  background-color: #7f1d1d;
+  color: #fca5a5;
+  border-color: #dc2626;
+} 

@@ -1,23 +1,51 @@
 
 import React from 'react';
+import ElegantSpinner from './spinners/ElegantSpinner';
+import LoadingContext from './LoadingContext';
 
 interface LoaderProps {
   text?: string;
+  type?: 'simple' | 'contextual';
+  context?: 'generation' | 'export' | 'sessions' | 'files' | 'auth' | 'general';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  spinnerType?: 'dots' | 'bars' | 'circles' | 'pulse' | 'ripple' | 'wave' | 'orbit' | 'cube';
+  className?: string;
 }
 
 const Loader: React.FC<LoaderProps> = ({ 
-  text = "Analyse du document et création de votre matériel d'étude..."
+  text = "Analyse du document et création de votre matériel d'étude...",
+  type = 'contextual',
+  context = 'generation',
+  size = 'lg',
+  spinnerType = 'orbit',
+  className = ''
 }) => {
+  // Si type est contextual, utiliser le composant contextuel
+  if (type === 'contextual') {
+    return (
+      <LoadingContext
+        context={context}
+        text={text}
+        size={size}
+        className={className}
+      />
+    );
+  }
+
+  // Sinon, utiliser le spinner simple élégant
   return (
-    <div className="flex flex-col items-center justify-center text-center p-8">
-      {/* Spinner simple */}
-      <svg className="animate-spin h-12 w-12 text-indigo-600 mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-      </svg>
+    <div className={`flex flex-col items-center justify-center text-center p-8 ${className}`}>
+      {/* Spinner élégant */}
+      <div className="mb-6">
+        <ElegantSpinner
+          type={spinnerType}
+          size={size}
+          color="primary"
+        />
+      </div>
       
-      <p className="mt-4 text-lg font-medium text-slate-700">{text}</p>
-      <p className="text-sm text-slate-500">Cela peut prendre quelques secondes.</p>
+      <p className="mt-4 text-lg font-medium text-slate-700 dark:text-slate-300">{text}</p>
+      <p className="text-sm text-slate-500 dark:text-slate-400">Cela peut prendre quelques secondes.</p>
     </div>
   );
 };

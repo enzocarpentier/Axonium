@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Générateur de QCM IA</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
   
     <!-- Les SDK Firebase sont chargés via importmap et initialisés dans firebase.ts -->
@@ -25,7 +25,292 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {}
+        }
+      }
+    </script>
+    <style>
+      /* Styles personnalisés pour le mode sombre */
+      .dark body {
+        background-color: #0f172a !important;
+        color: #ffffff !important;
+      }
+      
+      .dark .bg-white {
+        background-color: #1e293b !important;
+      }
+      
+      .dark .bg-slate-50 {
+        background-color: #0f172a !important;
+      }
+      
+      .dark .bg-slate-100 {
+        background-color: #1e293b !important;
+      }
+      
+      .dark .text-slate-900 {
+        color: #ffffff !important;
+      }
+      
+      .dark .text-slate-800 {
+        color: #ffffff !important;
+      }
+      
+      .dark .text-slate-600 {
+        color: #cbd5e1 !important;
+      }
+      
+      .dark .text-slate-500 {
+        color: #94a3b8 !important;
+      }
+      
+      .dark .border-slate-200 {
+        border-color: #334155 !important;
+      }
+      
+      .dark .border-slate-300 {
+        border-color: #475569 !important;
+      }
+      
+      .dark .bg-gradient-to-r {
+        background: linear-gradient(to right, #1e293b, #334155) !important;
+      }
+      
+      .dark .bg-gradient-to-br {
+        background: linear-gradient(to bottom right, #1e293b, #334155) !important;
+      }
+      
+      .dark .hover\\:bg-slate-200:hover {
+        background-color: #334155 !important;
+      }
+      
+      .dark .hover\\:bg-slate-100:hover {
+        background-color: #334155 !important;
+      }
+      
+      /* Styles pour les éléments spécifiques */
+      .dark .bg-gradient-to-br.from-indigo-50.to-purple-50 {
+        background: linear-gradient(to bottom right, #1e293b, #334155) !important;
+      }
+      
+      .dark .bg-gradient-to-r.from-indigo-50.to-purple-50 {
+        background: linear-gradient(to right, #1e293b, #334155) !important;
+      }
+      
+      .dark .bg-gradient-to-r.from-indigo-100.to-purple-100 {
+        background: linear-gradient(to right, #334155, #475569) !important;
+      }
+      
+      .dark .bg-gradient-to-r.from-slate-50.to-purple-50 {
+        background: linear-gradient(to right, #1e293b, #334155) !important;
+      }
+      
+      .dark .bg-gradient-to-r.from-slate-100.to-purple-100 {
+        background: linear-gradient(to right, #334155, #475569) !important;
+      }
+      
+      .dark .bg-gradient-to-r.from-red-50.to-pink-50 {
+        background: linear-gradient(to right, #7f1d1d, #9d174d) !important;
+      }
+      
+      .dark .bg-gradient-to-r.from-red-900.to-red-800 {
+        background: linear-gradient(to right, #450a0a, #7f1d1d) !important;
+      }
+      
+      .dark .bg-slate-50 {
+        background-color: #0f172a !important;
+      }
+      
+      .dark .bg-slate-100 {
+        background-color: #1e293b !important;
+      }
+      
+      .dark .bg-slate-200 {
+        background-color: #334155 !important;
+      }
+      
+      .dark .bg-slate-300 {
+        background-color: #475569 !important;
+      }
+      
+      .dark .bg-slate-400 {
+        background-color: #64748b !important;
+      }
+      
+      .dark .bg-slate-500 {
+        background-color: #64748b !important;
+      }
+      
+      .dark .bg-slate-600 {
+        background-color: #475569 !important;
+      }
+      
+      .dark .bg-slate-700 {
+        background-color: #334155 !important;
+      }
+      
+      .dark .bg-slate-800 {
+        background-color: #1e293b !important;
+      }
+      
+      .dark .bg-slate-900 {
+        background-color: #0f172a !important;
+      }
+      
+      /* Styles pour les inputs et textareas */
+      .dark input, .dark textarea {
+        background-color: #1e293b !important;
+        border-color: #475569 !important;
+        color: #ffffff !important;
+      }
+      
+      .dark input::placeholder, .dark textarea::placeholder {
+        color: #94a3b8 !important;
+      }
+      
+      /* Styles pour les boutons */
+      .dark .bg-indigo-600 {
+        background-color: #4f46e5 !important;
+      }
+      
+      .dark .hover\\:bg-indigo-700:hover {
+        background-color: #4338ca !important;
+      }
+      
+      /* Styles pour les cartes et sections */
+      .dark .bg-white {
+        background-color: #1e293b !important;
+      }
+      
+      .dark .border-slate-200 {
+        border-color: #334155 !important;
+      }
+      
+      .dark .border-slate-300 {
+        border-color: #475569 !important;
+      }
+      
+      .dark .border-slate-600 {
+        border-color: #475569 !important;
+      }
+      
+      .dark .border-slate-700 {
+        border-color: #334155 !important;
+      }
+      
+      /* Styles pour les textes */
+      .dark .text-slate-900 {
+        color: #ffffff !important;
+      }
+      
+      .dark .text-slate-800 {
+        color: #ffffff !important;
+      }
+      
+      .dark .text-slate-700 {
+        color: #e2e8f0 !important;
+      }
+      
+      .dark .text-slate-600 {
+        color: #cbd5e1 !important;
+      }
+      
+      .dark .text-slate-500 {
+        color: #94a3b8 !important;
+      }
+      
+      .dark .text-slate-400 {
+        color: #94a3b8 !important;
+      }
+      
+      .dark .text-slate-300 {
+        color: #cbd5e1 !important;
+      }
+      
+      .dark .text-slate-200 {
+        color: #e2e8f0 !important;
+      }
+      
+      /* Styles pour les hover states */
+      .dark .hover\\:text-slate-900:hover {
+        color: #ffffff !important;
+      }
+      
+      .dark .hover\\:text-white:hover {
+        color: #ffffff !important;
+      }
+      
+      .dark .hover\\:bg-slate-200:hover {
+        background-color: #334155 !important;
+      }
+      
+      .dark .hover\\:bg-slate-100:hover {
+        background-color: #334155 !important;
+      }
+      
+      .dark .hover\\:bg-slate-600:hover {
+        background-color: #475569 !important;
+      }
+      
+      .dark .hover\\:bg-slate-700:hover {
+        background-color: #334155 !important;
+      }
+      
+      /* Styles pour les bordures au hover */
+      .dark .hover\\:border-indigo-300:hover {
+        border-color: #6366f1 !important;
+      }
+      
+      .dark .hover\\:border-slate-300:hover {
+        border-color: #475569 !important;
+      }
+      
+      .dark .hover\\:border-slate-500:hover {
+        border-color: #64748b !important;
+      }
+      
+      /* Styles pour les ombres */
+      .dark .shadow-lg {
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2) !important;
+      }
+      
+      .dark .shadow-xl {
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2) !important;
+      }
+      
+      /* Styles pour les focus states */
+      .dark .focus\\:ring-indigo-500:focus {
+        --tw-ring-color: #6366f1 !important;
+      }
+      
+      .dark .focus\\:border-indigo-500:focus {
+        border-color: #6366f1 !important;
+      }
+      
+      /* Styles pour les bordures spécifiques */
+      .dark .border-indigo-200 {
+        border-color: #475569 !important;
+      }
+      
+      .dark .border-indigo-100 {
+        border-color: #475569 !important;
+      }
+      
+      /* Styles pour les arrière-plans spécifiques */
+      .dark .bg-slate-100 {
+        background-color: #334155 !important;
+      }
+      
+      /* Styles pour les gradients spécifiques */
+      .dark .bg-gradient-to-br.from-indigo-50.to-purple-50 {
+        background: linear-gradient(to bottom right, #1e293b, #334155) !important;
+      }
+    </style>
 </head>
   <body class="bg-slate-50 text-slate-800">
     <div id="root"></div>
