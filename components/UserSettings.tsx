@@ -34,6 +34,7 @@ interface UserSettingsProps {
     onPreferencesUpdate: (preferences: UserPreferences) => void;
     currentPreferences: UserPreferences;
     onDataExport?: () => void;
+    onRemoveDuplicates?: () => void;
     showNotification: (title: string, message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
@@ -43,6 +44,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({
     onPreferencesUpdate,
     currentPreferences,
     onDataExport,
+    onRemoveDuplicates,
     showNotification
 }) => {
     const [activeTab, setActiveTab] = useState<'display' | 'notifications' | 'data' | 'api'>('display');
@@ -349,6 +351,16 @@ const UserSettings: React.FC<UserSettingsProps> = ({
                         <DownloadIcon className="h-5 w-5" />
                         Exporter mes données
                     </button>
+                    
+                    {onRemoveDuplicates && (
+                        <button
+                            onClick={onRemoveDuplicates}
+                            className="w-full flex items-center justify-center gap-2 bg-orange-600 text-white font-medium py-3 px-4 rounded-lg hover:bg-orange-700 transition-colors"
+                        >
+                            <AlertCircleIcon className="h-5 w-5" />
+                            Nettoyer les doublons
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

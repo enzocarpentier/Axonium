@@ -196,3 +196,64 @@ export interface SessionWithSharing extends Session {
 }
 
 // Types pour le système de demandes d'inscription
+
+// Types pour la bibliothèque de documents centralisée
+export interface Document {
+  id: string;
+  userId: string;
+  name: string;
+  type: 'pdf' | 'image' | 'text' | 'other';
+  size: number; // en bytes
+  firebaseStorageUrl: string;
+  firebaseStorageRef: string;
+  uploadedAt: string;
+  lastUsedAt: string;
+  usageCount: number;
+  isProcessed: boolean;
+  processingStatus: 'pending' | 'processing' | 'completed' | 'error';
+  processedText?: string;
+  processingError?: string;
+  tags: string[];
+  description: string;
+  isPublic: boolean;
+}
+
+export interface DocumentUploadProgress {
+  file: File;
+  progress: number;
+  status: 'uploading' | 'processing' | 'completed' | 'error';
+  error?: string;
+}
+
+export interface DocumentProcessingResult {
+  text: string;
+  confidence: number;
+  processingTime: number;
+}
+
+export interface DocumentLibrary {
+  totalDocuments: number;
+  totalSize: number; // en bytes
+  documentsByType: Record<string, number>;
+  recentDocuments: Document[];
+  mostUsedDocuments: Document[];
+}
+
+// Types pour les sessions avec documents
+export interface SessionWithDocument extends Session {
+  sourceDocument?: {
+    documentId: string;
+    documentName: string;
+    pageRange?: string; // ex: "1-5" ou "all"
+  };
+}
+
+// Types pour les préférences de documents
+export interface DocumentPreferences {
+  autoProcessDocuments: boolean;
+  defaultDocumentTags: string[];
+  maxFileSize: number; // en MB
+  allowedFileTypes: string[];
+  autoGenerateThumbnails: boolean;
+  keepOriginalFiles: boolean;
+}

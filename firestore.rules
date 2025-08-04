@@ -2,7 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    
     // Règles pour les utilisateurs (permettre la création par les admins)
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
@@ -13,8 +12,18 @@ service cloud.firestore {
     
     // Règles pour les sessions (utilisateurs authentifiés uniquement)
     match /sessions/{document} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      // Permettre la lecture si l'utilisateur est authentifié et que c'est sa session
+      allow read: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        request.auth.uid == resource.data.userId
+      );
+      // Permettre l'écriture si l'utilisateur est authentifié et que c'est sa session
+      allow write: if request.auth != null && (
+        request.resource.data.userId == request.auth.uid ||
+        resource.data.userId == request.auth.uid
+      );
+      // Permettre la création si l'utilisateur est authentifié
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
     
     // Règles pour les paramètres utilisateur (utilisateurs authentifiés uniquement)
@@ -24,28 +33,69 @@ service cloud.firestore {
     
     // Règles pour les clés API (utilisateurs authentifiés uniquement)
     match /apiKeys/{document} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read, write: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        request.resource.data.userId == request.auth.uid
+      );
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
     
     // Règles pour les templates (utilisateurs authentifiés uniquement)
     match /templates/{document} {
-      allow read, write: if request.auth != null && (
+      allow read: if request.auth != null && (
         resource.data.userId == request.auth.uid || 
         resource.data.isPublic == true
       );
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow write: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        request.resource.data.userId == request.auth.uid
+      );
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
     
     // Règles pour les brouillons (utilisateurs authentifiés uniquement)
     match /drafts/{document} {
-      allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read, write: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        request.resource.data.userId == request.auth.uid
+      );
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
     
     // Règles pour les sessions partagées (utilisateurs authentifiés uniquement)
     match /sharedSessions/{document} {
       allow read, write: if request.auth != null;
+    }
+    
+    // Règles pour les permissions de partage
+    match /sharePermissions/{document} {
+      allow read, write: if request.auth != null && (
+        resource.data.sharedWithUserId == request.auth.uid ||
+        resource.data.sharedByUserId == request.auth.uid ||
+        request.resource.data.sharedWithUserId == request.auth.uid ||
+        request.resource.data.sharedByUserId == request.auth.uid
+      );
+      allow create: if request.auth != null && request.resource.data.sharedByUserId == request.auth.uid;
+    }
+    
+    // Règles pour les partages publics
+    match /publicShares/{document} {
+      allow read, write: if request.auth != null && (
+        resource.data.sharedByUserId == request.auth.uid ||
+        request.resource.data.sharedByUserId == request.auth.uid
+      );
+      allow create: if request.auth != null && request.resource.data.sharedByUserId == request.auth.uid;
+    }
+    
+    // Règles pour les invitations de partage
+    match /shareInvitations/{document} {
+      allow read, write: if request.auth != null && (
+        resource.data.sharedByUserId == request.auth.uid ||
+        resource.data.sharedWithEmail == request.auth.token.email ||
+        request.resource.data.sharedByUserId == request.auth.uid ||
+        request.resource.data.sharedWithEmail == request.auth.token.email
+      );
+      allow create: if request.auth != null && request.resource.data.sharedByUserId == request.auth.uid;
     }
   }
 } 

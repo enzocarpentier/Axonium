@@ -198,34 +198,51 @@ class ShareService {
     // Obtenir les sessions partagées avec un utilisateur
     async getSharedSessions(userId: string): Promise<SessionWithSharing[]> {
         try {
+            console.log('🔍 Tentative de récupération des sessions partagées pour:', userId);
+            
+            // Vérifier si Firestore est initialisé
+            if (!db) {
+                console.warn('⚠️ Firestore non initialisé, impossible de récupérer les sessions partagées');
+                return [];
+            }
+            
             const q = query(
                 collection(db, 'sharePermissions'),
                 where('sharedWithUserId', '==', userId)
             );
 
             const querySnapshot = await getDocs(q);
+            console.log('✅ Permissions trouvées:', querySnapshot.size);
+            
             const sharedSessions: SessionWithSharing[] = [];
 
             for (const permissionDoc of querySnapshot.docs) {
-                const permission = permissionDoc.data() as SharePermission;
-                
-                // Récupérer la session correspondante
-                const sessionDoc = await getDoc(doc(db, 'sessions', permission.sessionId));
-                if (sessionDoc.exists()) {
-                    const session = sessionDoc.data() as Session;
-                    const sessionWithSharing: SessionWithSharing = {
-                        ...session,
-                        isShared: true,
-                        sharedBy: permission.sharedByUserId,
-                        sharePermissions: [permission]
-                    };
-                    sharedSessions.push(sessionWithSharing);
+                try {
+                    const permission = permissionDoc.data() as SharePermission;
+                    
+                    // Récupérer la session correspondante
+                    const sessionDoc = await getDoc(doc(db, 'sessions', permission.sessionId));
+                    if (sessionDoc.exists()) {
+                        const session = sessionDoc.data() as Session;
+                        const sessionWithSharing: SessionWithSharing = {
+                            ...session,
+                            isShared: true,
+                            sharedBy: permission.sharedByUserId,
+                            sharePermissions: [permission]
+                        };
+                        sharedSessions.push(sessionWithSharing);
+                    }
+                } catch (sessionError) {
+                    console.warn('⚠️ Erreur lors de la récupération d\'une session partagée:', sessionError);
+                    // Continuer avec les autres sessions
                 }
             }
 
+            console.log('✅ Sessions partagées récupérées:', sharedSessions.length);
             return sharedSessions;
         } catch (error) {
-            console.error('Erreur lors de la récupération des sessions partagées:', error);
+            console.warn('⚠️ Erreur lors de la récupération des sessions partagées (fonctionnalité non critique):', error);
+            // Retourner un tableau vide au lieu de faire échouer l'application
             return [];
         }
     }

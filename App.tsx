@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
 
 
-import type { QuizData, QuizQuestion, UserAnswers, Session, QcmSession, SummarySession, ChatSession, Message, RevisionSheetData, RevisionSheetSession, GroundingSource, MindMapData, MindMapNode, MindMapSession, GuidedStudySession, Template, GenerationParameters, UserPreferences, SessionWithSharing } from './types.ts';
+import type { QuizData, QuizQuestion, UserAnswers, Session, QcmSession, SummarySession, ChatSession, Message, RevisionSheetData, RevisionSheetSession, GroundingSource, MindMapData, MindMapNode, MindMapSession, GuidedStudySession, Template, GenerationParameters, UserPreferences, SessionWithSharing, Document } from './types.ts';
 import { generateQuizFromText, generateSummaryFromText, startChatSession, generateRevisionSheetFromText, extractTextFromImage, getChatSystemInstruction, generateMindMapFromText, continueChat } from './services/geminiService.ts';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -16,6 +16,9 @@ import exportService, { type ExportOptions } from './services/exportService';
 import ShareModal from './components/ShareModal.tsx';
 import shareService from './services/shareService';
 import apiKeyService from './services/apiKeyService.ts';
+import { DocumentSelector } from './components/DocumentSelector.tsx';
+import { DocumentLibrary } from './components/DocumentLibrary.tsx';
+import documentService from './services/documentService';
 
 import PageTransition from './components/PageTransition.tsx';
 import AnimatedList from './components/AnimatedList.tsx';
@@ -24,7 +27,7 @@ import ElegantSpinner from './components/spinners/ElegantSpinner.tsx';
 import ProgressSpinner from './components/ProgressSpinner.tsx';
 
 import { useAnimations, usePageTransition } from './hooks/useAnimations.ts';
-import { BrainCircuitIcon, FileTextIcon, CheckCircleIcon, XCircleIcon, SparklesIcon, UploadCloudIcon, BookOpenIcon, ClipboardListIcon, RotateCwIcon, DownloadIcon, LayersIcon, MessageSquareIcon, UserIcon, SendIcon, HistoryIcon, Trash2Icon, NotebookTextIcon, SearchIcon, ImageIcon, GlobeIcon, MindMapIcon, GraduationCapIcon, LogOutIcon, MailIcon, KeyRoundIcon, ChevronDownIcon, SettingsIcon, ArrowLeftIcon, HomeIcon, BellIcon, AlertTriangleIcon, InfoIcon, XIcon, SunIcon, MoonIcon, HelpCircleIcon, MenuIcon, Share2Icon, UsersIcon } from './components/icons.tsx';
+import { BrainCircuitIcon, FileTextIcon, CheckCircleIcon, XCircleIcon, SparklesIcon, UploadCloudIcon, BookOpenIcon, ClipboardListIcon, RotateCwIcon, DownloadIcon, LayersIcon, MessageSquareIcon, UserIcon, SendIcon, HistoryIcon, Trash2Icon, NotebookTextIcon, SearchIcon, ImageIcon, GlobeIcon, MindMapIcon, GraduationCapIcon, LogOutIcon, MailIcon, KeyRoundIcon, ChevronDownIcon, SettingsIcon, ArrowLeftIcon, HomeIcon, BellIcon, AlertTriangleIcon, InfoIcon, XIcon, SunIcon, MoonIcon, HelpCircleIcon, MenuIcon, Share2Icon, UsersIcon, PenIcon, PlusIcon } from './components/icons.tsx';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Firebase imports
@@ -48,7 +51,7 @@ interface Draft {
 }
 
 type GenerationInputType = 'qcm' | 'summary' | 'chat' | 'revision_sheet' | 'mind_map' | 'guided_study';
-type AppState = 'auth' | 'main' | 'history' | 'input' | 'loading' | 'summary_display' | 'quiz' | 'results' | 'flashcards' | 'chat' | 'revision_sheet_display' | 'mind_map_display' | 'guided_study';
+type AppState = 'auth' | 'main' | 'history' | 'input' | 'loading' | 'title_input' | 'summary_display' | 'quiz' | 'results' | 'flashcards' | 'chat' | 'revision_sheet_display' | 'mind_map_display' | 'guided_study';
 type Difficulty = 'Facile' | 'Moyen' | 'Difficile';
 
 // Types pour le système de notifications
@@ -90,6 +93,15 @@ const App: React.FC = () => {
     
     const [sessions, setSessions] = useState<(Session | SessionWithSharing)[]>([]);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+    const [customSessionTitle, setCustomSessionTitle] = useState<string>('');
+    const [showTitleInput, setShowTitleInput] = useState<boolean>(false);
+    const [pendingSessionData, setPendingSessionData] = useState<Omit<Session, 'id'> | null>(null);
+    
+    // États pour la bibliothèque de documents
+    const [showDocumentSelector, setShowDocumentSelector] = useState<boolean>(false);
+    const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+    const [showDocumentLibrary, setShowDocumentLibrary] = useState<boolean>(false);
+    const [showDocumentUploader, setShowDocumentUploader] = useState<boolean>(false);
 
     // États pour les brouillons Firebase
     const [documentText, setDocumentText] = useState<string>('');
@@ -445,6 +457,29 @@ const App: React.FC = () => {
         setShowCustomTemplateCreator(true);
     };
 
+    // Gérer la sélection de document depuis la bibliothèque
+    const handleDocumentSelect = (document: Document, processedText: string) => {
+        setSelectedDocument(document);
+        setDocumentText(processedText);
+        setShowDocumentSelector(false);
+        showNotification(
+            'Document sélectionné',
+            `${document.name} a été chargé avec succès`,
+            'success'
+        );
+    };
+
+    // Ouvrir le sélecteur de documents
+    const handleOpenDocumentSelector = () => {
+        setShowDocumentSelector(true);
+    };
+
+    // Supprimer le document sélectionné
+    const handleClearSelectedDocument = () => {
+        setSelectedDocument(null);
+        setDocumentText('');
+    };
+
     const handleSaveCustomTemplate = async (template: Template) => {
         if (!currentUser) {
             console.error('Utilisateur non connecté');
@@ -593,26 +628,33 @@ const App: React.FC = () => {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            console.log('🔄 État d\'authentification changé:', user ? 'Utilisateur connecté' : 'Utilisateur déconnecté');
             setCurrentUser(user);
             setAuthLoading(false);
+            
             if (user) {
-
-                
+                console.log('✅ Utilisateur authentifié, chargement des données...');
                 setAppState('loading');
-                try {
-                    const userSessions = await fetchSessions(user.uid);
-                    console.log('Sessions chargées:', userSessions.length, userSessions);
-                    setSessions(userSessions);
-                } catch (error) {
-                    console.error("Erreur lors du chargement des sessions:", error);
-                }
-                setAppState('main'); // Changé pour afficher le menu principal
+                
+                // Attendre un peu avant de charger les données pour éviter les conflits
+                setTimeout(async () => {
+                    try {
+                        const userSessions = await fetchSessions(user.uid);
+                        console.log('✅ Sessions chargées:', userSessions.length);
+                        setSessions(userSessions);
+                        setAppState('main');
+                    } catch (error) {
+                        console.error("❌ Erreur lors du chargement des sessions:", error);
+                        setAppState('main'); // Afficher quand même le menu principal
+                    }
+                }, 500);
                 
                 // Vérifier les sessions partagées après que l'utilisateur soit complètement initialisé
                 setTimeout(async () => {
                     await checkSharedSessionFromURL();
                 }, 2000);
             } else {
+                console.log('👤 Utilisateur non connecté, affichage de la page d\'authentification');
                 setSessions([]);
                 setAppState('auth');
                 
@@ -661,16 +703,23 @@ const App: React.FC = () => {
             if (!currentUser) return;
             
             try {
+                console.log('🔍 Chargement du profil utilisateur pour:', currentUser.uid);
                 const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+                
                 if (userDoc.exists()) {
                     const userData = userDoc.data();
+                    console.log('✅ Données utilisateur trouvées:', userData);
+                    
                     const hasSeenWelcome = userData.hasSeenWelcomeNotification || false;
+                    const firstName = userData.firstName || userData.displayName?.split(' ')[0] || null;
                     
                     setUserProfile({
-                        firstName: userData.firstName,
-                        email: userData.email,
+                        firstName: firstName,
+                        email: userData.email || currentUser.email,
                         hasSeenWelcomeNotification: hasSeenWelcome
                     });
+                    
+                    console.log('✅ Profil utilisateur chargé:', { firstName, email: userData.email });
                     
                     if (userData.favoriteTemplates) {
                         setFavoriteTemplates(userData.favoriteTemplates);
@@ -696,6 +745,7 @@ const App: React.FC = () => {
                         }, 1000);
                     }
                 } else {
+                    console.log('⚠️ Aucun profil utilisateur trouvé, création d\'un nouveau profil');
                     // Créer un profil pour les nouveaux utilisateurs
                     await setDoc(doc(db, "users", currentUser.uid), {
                         email: currentUser.email,
@@ -727,7 +777,7 @@ const App: React.FC = () => {
                     }, 1000);
                 }
             } catch (error) {
-                console.error("Erreur lors du chargement du profil:", error);
+                console.error("❌ Erreur lors du chargement du profil:", error);
             }
         };
 
@@ -1044,7 +1094,7 @@ const App: React.FC = () => {
                     // Notification de succès
                     showNotification(
                             'Session partagée importée', 
-                            `La session "${(sharedSession as any).title}" a été copiée dans votre historique.`, 
+                            `La création "${(sharedSession as any).title}" a été copiée dans vos créations.`, 
                         'success'
                     );
                     
@@ -1083,44 +1133,54 @@ const App: React.FC = () => {
 
     const fetchSessions = async (userId: string): Promise<(Session | SessionWithSharing)[]> => {
         try {
+            console.log('🔍 Tentative de chargement des sessions pour l\'utilisateur:', userId);
+            
+            if (!db) {
+                console.error('❌ Firestore non initialisé');
+                return [];
+            }
+            
             const sessionsCol = collection(db, "sessions");
             const q = query(sessionsCol, where("userId", "==", userId));
             const querySnapshot = await getDocs(q);
             const userSessions = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Session))
                 .filter(session => session && session.id && session.title && session.createdAt); // Filtrer les sessions vides
             
-            console.log('Sessions utilisateur chargées:', userSessions.length);
+            console.log('✅ Sessions utilisateur chargées:', userSessions.length);
             
             // Charger aussi les sessions partagées avec l'utilisateur
-            const sharedSessions = await shareService.getSharedSessions(userId);
-            
-            console.log('Sessions partagées chargées:', sharedSessions.length);
-            console.log('Détails des sessions partagées:', sharedSessions.map(s => ({
-                id: (s as any).id,
-                title: (s as any).title,
-                isShared: s.isShared,
-                sharedBy: s.sharedBy
-            })));
-            
-            // Combiner toutes les sessions (Firebase + sessions partagées)
-            const allSessions = [...userSessions, ...sharedSessions];
-            
-            // Supprimer les doublons basés sur l'ID
-            const uniqueSessions = allSessions.filter((session, index, self) => 
-                index === self.findIndex(s => (s as any).id === (session as any).id)
-            );
-            
-            console.log('Total des sessions (après déduplication):', uniqueSessions.length);
-            
-            // Trier par date de création
-            return uniqueSessions.sort((a, b) => {
-                const dateA = new Date((a as any).createdAt).getTime();
-                const dateB = new Date((b as any).createdAt).getTime();
-                return dateB - dateA;
-            });
+            try {
+                const sharedSessions = await shareService.getSharedSessions(userId);
+                console.log('✅ Sessions partagées chargées:', sharedSessions.length);
+                
+                // Combiner toutes les sessions (Firebase + sessions partagées)
+                const allSessions = [...userSessions, ...sharedSessions];
+                
+                // Supprimer les doublons basés sur l'ID
+                const uniqueSessions = allSessions.filter((session, index, self) => 
+                    index === self.findIndex(s => (s as any).id === (session as any).id)
+                );
+                
+                console.log('✅ Total des sessions (après déduplication):', uniqueSessions.length);
+                
+                // Trier par date de création
+                return uniqueSessions.sort((a, b) => {
+                    const dateA = new Date((a as any).createdAt).getTime();
+                    const dateB = new Date((b as any).createdAt).getTime();
+                    return dateB - dateA;
+                });
+            } catch (shareError) {
+                console.warn('⚠️ Erreur lors du chargement des sessions partagées:', shareError);
+                // Retourner seulement les sessions Firebase en cas d'erreur avec les sessions partagées
+                return userSessions.sort((a, b) => {
+                    const dateA = new Date((a as any).createdAt).getTime();
+                    const dateB = new Date((b as any).createdAt).getTime();
+                    return dateB - dateA;
+                });
+            }
         } catch (error) {
-            console.error("Erreur de lecture des sessions Firestore:", error);
-            setError("Impossible de charger votre historique.");
+            console.error("❌ Erreur de lecture des sessions Firestore:", error);
+            setError("Impossible de charger vos créations.");
             return [];
         }
     };
@@ -1143,6 +1203,49 @@ const App: React.FC = () => {
 
 
 
+
+    // Fonction pour générer un nom de session significatif
+    const generateSessionTitle = (documentText: string, generationType: GenerationInputType, difficulty?: Difficulty, numQuestions?: number): string => {
+        // Extraire les mots-clés du document
+        const words = documentText.toLowerCase()
+            .replace(/[^\w\s]/g, '')
+            .split(/\s+/)
+            .filter(word => word.length > 3)
+            .slice(0, 10);
+        
+        // Trouver les mots les plus fréquents
+        const wordCount = words.reduce((acc, word) => {
+            acc[word] = (acc[word] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+        
+        const topWords = Object.entries(wordCount)
+            .sort(([,a], [,b]) => b - a)
+            .slice(0, 3)
+            .map(([word]) => word.charAt(0).toUpperCase() + word.slice(1));
+        
+        // Générer un titre basé sur le type de génération
+        const typePrefixes = {
+            'qcm': `QCM ${difficulty || 'Moyen'} - ${numQuestions || 5} questions`,
+            'summary': 'Résumé',
+            'chat': 'Discussion',
+            'revision_sheet': 'Fiche de révision',
+            'mind_map': 'Carte mentale',
+            'guided_study': 'Étude guidée'
+        };
+        
+        const prefix = typePrefixes[generationType];
+        const keywords = topWords.length > 0 ? `: ${topWords.join(', ')}` : '';
+        
+        // Si le document commence par un titre clair, l'utiliser
+        const firstLine = documentText.split('\n')[0].trim();
+        if (firstLine.length > 10 && firstLine.length < 100 && !firstLine.includes('...')) {
+            return `${prefix} - ${firstLine}`;
+        }
+        
+        // Sinon, utiliser les mots-clés
+        return `${prefix}${keywords}`;
+    };
 
     const handleGenerate = useCallback(async () => {
         if (!currentUser) {
@@ -1178,7 +1281,7 @@ const App: React.FC = () => {
                 userId: currentUser.uid,
                 documentText,
                 createdAt: new Date().toISOString(),
-                title: documentText.split('\n')[0].substring(0, 50) + (documentText.length > 50 ? '...' : '') || "Nouvelle Session",
+                title: generateSessionTitle(documentText, generationType, difficulty, numQuestions),
             };
             
             // Récupérer le prompt spécialisé du template sélectionné
@@ -1191,39 +1294,44 @@ const App: React.FC = () => {
                     const quizResult = await generateQuizFromText(documentText, numQuestions, difficulty, currentUser.uid, templatePrompt);
                     const data: Omit<QcmSession, 'id'> = { ...newSessionBase, generationType: 'qcm', quizData: quizResult, userAnswers: {}, score: 0 };
                     newSessionData = data;
-                    setQuizData(quizResult); setActiveQuiz(quizResult); resetQuizState(); setFlashcardSource('input');
-                    setAppState('quiz');
+                    setPendingSessionData(data);
+                    setCustomSessionTitle(newSessionBase.title);
+                    setAppState('title_input');
                     break;
                 }
                 case 'summary': {
                     const summaryResult = await generateSummaryFromText(documentText, currentUser.uid, templatePrompt);
                     const data: Omit<SummarySession, 'id'> = { ...newSessionBase, generationType: 'summary', summary: summaryResult };
                     newSessionData = data;
-                    setSummary(summaryResult);
-                    setAppState('summary_display');
+                    setPendingSessionData(data);
+                    setCustomSessionTitle(newSessionBase.title);
+                    setAppState('title_input');
                     break;
                 }
                 case 'chat': {
                     const data: Omit<ChatSession, 'id'> = { ...newSessionBase, generationType: 'chat', messages: [] };
                     newSessionData = data;
-                    setChatMessages([]);
-                    setAppState('chat');
+                    setPendingSessionData(data);
+                    setCustomSessionTitle(newSessionBase.title);
+                    setAppState('title_input');
                     break;
                 }
                 case 'revision_sheet': {
                     const sheetResult = await generateRevisionSheetFromText(documentText, currentUser.uid, templatePrompt);
                     const data: Omit<RevisionSheetSession, 'id'> = { ...newSessionBase, generationType: 'revision_sheet', revisionSheetData: sheetResult };
                     newSessionData = data;
-                    setRevisionSheetData(sheetResult);
-                    setAppState('revision_sheet_display');
+                    setPendingSessionData(data);
+                    setCustomSessionTitle(newSessionBase.title);
+                    setAppState('title_input');
                     break;
                 }
                 case 'mind_map': {
                     const mindMapResult = await generateMindMapFromText(documentText, currentUser.uid);
                     const data: Omit<MindMapSession, 'id'> = { ...newSessionBase, generationType: 'mind_map', mindMapData: mindMapResult };
                     newSessionData = data;
-                    setMindMapData(mindMapResult);
-                    setAppState('mind_map_display');
+                    setPendingSessionData(data);
+                    setCustomSessionTitle(newSessionBase.title);
+                    setAppState('title_input');
                     break;
                 }
                 case 'guided_study': {
@@ -1243,30 +1351,34 @@ const App: React.FC = () => {
                 }
             }
             
-            if (newSessionData) {
+            // Créer la session seulement pour les types qui ne passent pas par title_input
+            if (newSessionData && generationType === 'guided_study') {
                 const docRef = await addDoc(collection(db, "sessions"), newSessionData);
                 const finalSession = { id: docRef.id, ...newSessionData } as Session;
                 setSessions(prev => [finalSession, ...prev]);
                 setActiveSessionId(finalSession.id);
                 
-                // Notification de succès selon le type de génération
-                const typeNames = {
-                    'qcm': 'QCM',
-                    'summary': 'Résumé',
-                    'chat': 'Chat',
-                    'revision_sheet': 'Fiche de révision',
-                    'mind_map': 'Carte mentale',
-                    'guided_study': 'Étude guidée'
-                };
+                // Notification de succès
                 showNotification(
-                    `${typeNames[generationType]} créé !`,
-                    `Votre ${typeNames[generationType].toLowerCase()} a été généré avec succès.`,
+                    'Étude guidée créée !',
+                    'Votre étude guidée a été générée avec succès.',
                     'success'
                 );
                 
-                // Nettoyer le brouillon après la génération réussie
-                await clearDraft();
-            }
+                            // Nettoyer le brouillon après la génération réussie
+            await clearDraft();
+            
+            // Notification pour supprimer les doublons si nécessaire
+            showNotification(
+                'Doublons détectés',
+                'Il semble que vous ayez des sessions en double. Cliquez pour les nettoyer.',
+                'warning',
+                {
+                    label: 'Nettoyer les doublons',
+                    onClick: removeDuplicateSessions
+                }
+            );
+        }
 
 
 
@@ -1422,6 +1534,90 @@ const App: React.FC = () => {
             }
         }
     };
+
+    const handleConfirmTitle = async () => {
+        if (!pendingSessionData || !customSessionTitle.trim()) {
+            return;
+        }
+
+        try {
+            // Créer la session avec le titre personnalisé
+            const sessionData = { ...pendingSessionData, title: customSessionTitle.trim() };
+            
+            // Créer la session dans Firebase
+            const docRef = await addDoc(collection(db, 'sessions'), sessionData);
+            const newSession = { ...sessionData, id: docRef.id } as Session;
+            
+            // Ajouter la session à la liste
+            setSessions(prev => [newSession, ...prev]);
+            
+            // Configurer l'affichage selon le type de session
+            switch (sessionData.generationType) {
+                case 'qcm': {
+                    setQuizData((sessionData as QcmSession).quizData);
+                    setActiveQuiz((sessionData as QcmSession).quizData);
+                    resetQuizState();
+                    setFlashcardSource('input');
+                    setAppState('quiz');
+                    break;
+                }
+                case 'summary': {
+                    setSummary((sessionData as SummarySession).summary);
+                    setAppState('summary_display');
+                    break;
+                }
+                case 'chat': {
+                    setChatMessages([]);
+                    setAppState('chat');
+                    break;
+                }
+                case 'revision_sheet': {
+                    setRevisionSheetData((sessionData as RevisionSheetSession).revisionSheetData);
+                    setAppState('revision_sheet_display');
+                    break;
+                }
+                case 'mind_map': {
+                    setMindMapData((sessionData as MindMapSession).mindMapData);
+                    setAppState('mind_map_display');
+                    break;
+                }
+                case 'guided_study': {
+                    const guidedSession = sessionData as GuidedStudySession;
+                    setRevisionSheetData(guidedSession.revisionSheetData);
+                    setQuizData(guidedSession.quizData);
+                    setActiveQuiz(guidedSession.quizData);
+                    resetQuizState();
+                    setFlashcardSource('input');
+                    setAppState('guided_study');
+                    break;
+                }
+            }
+            
+            // Réinitialiser les états
+            setPendingSessionData(null);
+            setCustomSessionTitle('');
+            
+            showNotification(
+                'Création réussie',
+                'Votre contenu a été créé avec succès !',
+                'success'
+            );
+            
+        } catch (error) {
+            console.error('Erreur lors de la création de la session:', error);
+            showNotification(
+                'Erreur',
+                'Une erreur est survenue lors de la création de votre contenu.',
+                'error'
+            );
+        }
+    };
+
+    const handleCancelTitle = () => {
+        setPendingSessionData(null);
+        setCustomSessionTitle('');
+        setAppState('input');
+    };
     
     const handleOpenSession = (session: Session) => {
         setActiveSessionId(session.id);
@@ -1491,15 +1687,15 @@ const App: React.FC = () => {
                 if (sessionToDelete && (sessionToDelete as any).isShared === true) {
                     console.log('Session partagée détectée, proposition de retrait local');
                     // C'est une session partagée - proposer de la retirer de l'historique local
-                    if (window.confirm("Cette session vous a été partagée. Voulez-vous la retirer de votre historique local ? Elle restera disponible pour les autres utilisateurs.")) {
+                    if (window.confirm("Cette création vous a été partagée. Voulez-vous la retirer de vos créations locales ? Elle restera disponible pour les autres utilisateurs.")) {
                         // Retirer de l'état local
                         setSessions(prev => prev.filter(s => s.id !== sessionId));
                         
 
                         
                         showNotification(
-                            'Session retirée',
-                            'La session partagée a été retirée de votre historique.',
+                            'Création retirée',
+                            'La création partagée a été retirée de vos créations.',
                             'success'
                         );
                     }
@@ -1523,8 +1719,8 @@ const App: React.FC = () => {
                 setSessions(prev => prev.filter(s => s.id !== sessionId));
                 
                 showNotification(
-                    'Session supprimée',
-                    'La session a été supprimée avec succès.',
+                    'Création supprimée',
+                    'La création a été supprimée avec succès.',
                     'success'
                 );
             } catch (error) {
@@ -1532,7 +1728,7 @@ const App: React.FC = () => {
                 setError("Impossible de supprimer la session.");
                 showNotification(
                     'Erreur de suppression',
-                    'Une erreur est survenue lors de la suppression de la session.',
+                    'Une erreur est survenue lors de la suppression de la création.',
                     'error'
                 );
             }
@@ -1771,19 +1967,22 @@ const App: React.FC = () => {
                         direction="up"
                         className={mainTransitionClass}
                     >
-                                                <MainMenuSection
+                                                <DashboardSection
                             sessions={sessions}
                             onNewGeneration={handleCreateNew}
                             onOpenSession={handleOpenSession}
                             onDeleteSession={handleDeleteSession}
                             onShareSession={handleShareSession}
+                            onRenameSession={handleRenameSession}
                             onLogout={handleLogout}
                             currentUser={currentUser}
                             userProfile={userProfile}
                             userPreferences={userPreferences}
                             onOpenSettings={() => setShowUserSettings(true)}
-                                                          isAdmin={false}
-            
+                            onImproveSessionNames={improveExistingSessionNames}
+                            onRemoveDuplicates={removeDuplicateSessions}
+                            onSetGenerationType={setGenerationType}
+                            onUpdateUserProfile={updateUserProfile}
                         />
                     </PageTransition>
                 )}
@@ -1836,6 +2035,28 @@ const App: React.FC = () => {
                             onTemplateSelect={handleTemplateSelect}
                             onShowTemplateSelector={() => setShowTemplateSelector(true)}
                             userPreferences={userPreferences}
+                            onOpenDocumentSelector={handleOpenDocumentSelector}
+                            selectedDocument={selectedDocument}
+                            onClearSelectedDocument={handleClearSelectedDocument}
+                            showDocumentLibrary={showDocumentSelector}
+                            onToggleDocumentLibrary={() => setShowDocumentSelector(!showDocumentSelector)}
+                        />
+                    </PageTransition>
+                )}
+
+                {/* Section saisie du titre */}
+                {appState === 'title_input' && (
+                    <PageTransition 
+                        isVisible={true} 
+                        direction="up"
+                        className="flex-1 overflow-hidden"
+                    >
+                        <TitleInputSection 
+                            title={customSessionTitle}
+                            setTitle={setCustomSessionTitle}
+                            onConfirm={handleConfirmTitle}
+                            onCancel={handleCancelTitle}
+                            generationType={pendingSessionData?.generationType || 'qcm'}
                         />
                     </PageTransition>
                 )}
@@ -1923,8 +2144,150 @@ const App: React.FC = () => {
         );
     };
 
+    // Fonction pour renommer une session
+    const handleRenameSession = async (sessionId: string, newTitle: string) => {
+        if (!currentUser) return;
+        
+        try {
+            // Mettre à jour dans Firebase
+            await updateDoc(doc(db, "sessions", sessionId), {
+                title: newTitle
+            });
+            
+            // Mettre à jour dans l'état local
+            setSessions(prev => prev.map(s => 
+                s.id === sessionId ? { ...s, title: newTitle } : s
+            ));
+            
+            showNotification(
+                'Création renommée',
+                'Le nom de la création a été mis à jour avec succès.',
+                'success'
+            );
+        } catch (error) {
+            console.error("Erreur lors du renommage:", error);
+            showNotification(
+                'Erreur',
+                'Impossible de renommer la création.',
+                'error'
+            );
+        }
+    };
+
+    // Fonction pour améliorer automatiquement les noms des sessions existantes
+    // Fonction pour supprimer les sessions en double
+    const removeDuplicateSessions = async () => {
+        if (!currentUser) return;
+        
+        try {
+            const sessionsToCheck = sessions.filter(s => s.userId === currentUser.uid);
+            const duplicates: string[] = [];
+            
+            // Trouver les sessions avec le même contenu mais des titres différents
+            for (let i = 0; i < sessionsToCheck.length; i++) {
+                for (let j = i + 1; j < sessionsToCheck.length; j++) {
+                    const session1 = sessionsToCheck[i];
+                    const session2 = sessionsToCheck[j];
+                    
+                    // Vérifier si les sessions ont le même contenu mais des titres différents
+                    if (session1.documentText === session2.documentText && 
+                        session1.generationType === session2.generationType &&
+                        session1.title !== session2.title) {
+                        
+                        // Garder celle avec le titre le plus long (probablement le titre personnalisé)
+                        const sessionToDelete = session1.title.length > session2.title.length ? session2 : session1;
+                        duplicates.push(sessionToDelete.id);
+                    }
+                }
+            }
+            
+            // Supprimer les doublons
+            for (const sessionId of duplicates) {
+                await deleteDoc(doc(db, "sessions", sessionId));
+            }
+            
+            if (duplicates.length > 0) {
+                // Recharger les sessions
+                const userSessions = await fetchSessions(currentUser.uid);
+                setSessions(userSessions);
+                
+                showNotification(
+                    'Doublons supprimés',
+                    `${duplicates.length} session(s) en double ont été supprimées.`,
+                    'success'
+                );
+            } else {
+                showNotification(
+                    'Aucun doublon trouvé',
+                    'Toutes vos sessions sont uniques.',
+                    'info'
+                );
+            }
+        } catch (error) {
+            console.error("Erreur lors de la suppression des doublons:", error);
+            showNotification(
+                'Erreur',
+                'Impossible de supprimer les sessions en double.',
+                'error'
+            );
+        }
+    };
+
+    const improveExistingSessionNames = async () => {
+        if (!currentUser) return;
+        
+        try {
+            const sessionsToUpdate = sessions.filter(session => {
+                // Identifier les sessions avec des noms génériques
+                const genericNames = ['Nouvelle Session', 'Session', 'Document', 'Texte'];
+                return genericNames.some(name => session.title.includes(name));
+            });
+            
+            if (sessionsToUpdate.length === 0) {
+                showNotification(
+                    'Aucune amélioration nécessaire',
+                    'Toutes vos sessions ont déjà des noms significatifs.',
+                    'info'
+                );
+                return;
+            }
+            
+            let updatedCount = 0;
+            for (const session of sessionsToUpdate) {
+                const newTitle = generateSessionTitle(
+                    session.documentText, 
+                    session.generationType,
+                    session.generationType === 'qcm' ? 'Moyen' : undefined,
+                    session.generationType === 'qcm' ? (session as QcmSession).quizData?.questions?.length : undefined
+                );
+                
+                await updateDoc(doc(db, "sessions", session.id), {
+                    title: newTitle
+                });
+                updatedCount++;
+            }
+            
+            // Recharger les sessions
+            const userSessions = await fetchSessions(currentUser.uid);
+            setSessions(userSessions);
+            
+            showNotification(
+                'Noms améliorés',
+                `${updatedCount} création(s) ont été renommées avec des noms plus significatifs.`,
+                'success'
+            );
+        } catch (error) {
+            console.error("Erreur lors de l'amélioration des noms:", error);
+            showNotification(
+                'Erreur',
+                'Impossible d\'améliorer les noms des créations.',
+                'error'
+            );
+        }
+    };
+
     return (
-        <div className="h-screen bg-slate-50 dark:bg-slate-900 flex flex-col overflow-hidden transition-colors duration-300">
+        <div className="h-screen bg-slate-50 dark:bg-slate-900 flex flex-col overflow-hidden transition-colors duration-300 min-h-screen flex-1">
             <header className="w-full bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shadow-sm z-50 flex-shrink-0 transition-colors duration-300">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-14">
@@ -1943,19 +2306,40 @@ const App: React.FC = () => {
                         {currentUser && (
                             <>
                                 {/* Navigation desktop */}
-                                <nav className="hidden md:flex items-center gap-6">
-                                    <AnimatedNavigation isActive={appState === 'main'} onClick={() => setAppState('main')}>
+                                <nav className="hidden md:flex items-center gap-2">
+                                    <button
+                                        onClick={() => setAppState('main')}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
+                                            appState === 'main'
+                                                ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25'
+                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700'
+                                        }`}
+                                    >
                                         <HomeIcon className="h-5 w-5" />
                                         Accueil
-                                    </AnimatedNavigation>
-                                    <AnimatedNavigation isActive={appState === 'history'} onClick={() => setAppState('history')}>
-                                        <HistoryIcon className="h-5 w-5" />
-                                        Historique
-                                    </AnimatedNavigation>
-                                    <AnimatedNavigation isActive={appState === 'input'} onClick={handleCreateNew}>
-                                        <SparklesIcon className="h-5 w-5" />
-                                        Nouvelle Génération
-                                    </AnimatedNavigation>
+                                    </button>
+                                    <button
+                                        onClick={() => setAppState('history')}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
+                                            appState === 'history'
+                                                ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25'
+                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700'
+                                        }`}
+                                    >
+                                        <BookOpenIcon className="h-5 w-5" />
+                                        Études
+                                    </button>
+                                    <button
+                                        onClick={handleCreateNew}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
+                                            appState === 'input'
+                                                ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25'
+                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700'
+                                        }`}
+                                    >
+                                        <PlusIcon className="h-5 w-5" />
+                                        Créer
+                                    </button>
                                 </nav>
 
                                 {/* Bouton menu mobile */}
@@ -1971,37 +2355,6 @@ const App: React.FC = () => {
 
                         {/* Bouton de toggle du thème - toujours visible */}
                         <div className="flex items-center gap-3">
-                            {/* Bouton de débogage temporaire */}
-                            {currentUser && (
-                                <button
-                                    onClick={async () => {
-                                        try {
-                                            const userSessions = await fetchSessions(currentUser.uid);
-                                            console.log('Test de rechargement des sessions:', userSessions);
-                                            
-                                            // Combiner toutes les sessions
-                                            const allSessions = [...userSessions];
-                                            const uniqueSessions = allSessions.filter((session, index, self) => 
-                                                index === self.findIndex(s => (s as any).id === (session as any).id)
-                                            );
-                                            
-                                            console.log('Total des sessions uniques:', uniqueSessions);
-                                            setSessions(uniqueSessions);
-                                            showNotification(
-                                                'Sessions rechargées',
-                                                `${uniqueSessions.length} sessions chargées`,
-                                                'info'
-                                            );
-                                        } catch (error) {
-                                            console.error("Erreur de test:", error);
-                                        }
-                                    }}
-                                    className="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                                    title="Recharger les sessions (débogage)"
-                                >
-                                    <RotateCwIcon className="h-5 w-5" />
-                                </button>
-                            )}
                             <button
                                 onClick={toggleTheme}
                                 className="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
@@ -2168,15 +2521,15 @@ const App: React.FC = () => {
                                     : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                             }`}
                         >
-                            <SparklesIcon className="h-5 w-5" />
-                            Nouvelle Génération
+                            <PlusIcon className="h-5 w-5" />
+                            Créer
                         </button>
                     </nav>
                 </div>
             </div>
         )}
-            <main className="flex-1 p-2 sm:p-3 lg:p-4 overflow-hidden">
-                <div className={`mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 transition-all duration-500 ease-in-out h-full flex flex-col ${appState === 'mind_map_display' ? 'max-w-screen-xl' : 'max-w-7xl'}`}>
+            <main className="flex-1 p-2 pt-2 pb-4 overflow-hidden min-h-0">
+                <div className={`mx-auto transition-all duration-500 ease-in-out h-full flex flex-col min-h-0 flex-1 ${appState === 'mind_map_display' ? 'max-w-screen-xl' : 'max-w-full'}`}>
                         {showTemplateSelector ? (
                             <div className="p-4 flex-1 overflow-auto">
                                 <TemplateSelector
@@ -2191,7 +2544,7 @@ const App: React.FC = () => {
                                 />
                             </div>
                         ) : (
-                            <div className="flex-1 overflow-auto">
+                            <div className="flex-1 overflow-auto h-full min-h-0">
                                 {renderContent()}
                             </div>
                         )}
@@ -2222,6 +2575,7 @@ const App: React.FC = () => {
                                     setShowUserSettings(false);
                                     setShowDataExportModal(true);
                                 }}
+                                onRemoveDuplicates={removeDuplicateSessions}
                                 showNotification={showNotification}
                             />
                         )}
@@ -2250,7 +2604,6 @@ const App: React.FC = () => {
 
                 </div>
                     </main>
-                    <footer className="text-center py-0.5 flex-shrink-0"></footer>
                 </div>
     );
 };
@@ -2365,55 +2718,113 @@ const AuthSection: React.FC<{
     );
 };
 
-// --- Main Menu Section ---
-interface MainMenuSectionProps {
+// --- Dashboard Section ---
+interface DashboardSectionProps {
     sessions: (Session | SessionWithSharing)[];
     onNewGeneration: () => void;
     onOpenSession: (session: Session) => void;
     onDeleteSession: (sessionId: string) => void;
     onShareSession: (session: Session) => void;
+    onRenameSession: (sessionId: string, newTitle: string) => void;
     onLogout: () => void;
     currentUser: User;
     userProfile: {firstName?: string, email?: string, hasSeenWelcomeNotification?: boolean} | null;
     userPreferences: UserPreferences;
     onOpenSettings: () => void;
+    onImproveSessionNames: () => void;
+    onRemoveDuplicates: () => void;
+    onSetGenerationType: (type: GenerationInputType) => void;
+    onUpdateUserProfile: (firstName: string) => void;
 }
 
-const MainMenuSection: React.FC<MainMenuSectionProps> = ({ 
+const DashboardSection: React.FC<DashboardSectionProps> = ({ 
     sessions, 
     onNewGeneration, 
     onOpenSession, 
     onDeleteSession, 
     onShareSession,
+    onRenameSession,
     onLogout, 
     currentUser,
     userProfile,
     userPreferences,
-    onOpenSettings
+    onOpenSettings,
+    onImproveSessionNames,
+    onRemoveDuplicates,
+    onSetGenerationType,
+    onUpdateUserProfile
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showAllHistory, setShowAllHistory] = useState(false);
+    const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+    const [editingTitle, setEditingTitle] = useState('');
+    
+    // Calculer les statistiques du tableau de bord
+    const dashboardStats = useMemo(() => {
+        const now = new Date();
+        const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const lastMonth = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        
+        const recentSessions = sessions.filter(s => new Date(s.createdAt) >= lastWeek);
+        const monthlySessions = sessions.filter(s => new Date(s.createdAt) >= lastMonth);
+        
+        const typeStats = sessions.reduce((acc, session) => {
+            acc[session.generationType] = (acc[session.generationType] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+        
+        // Sessions inachevées (QCM non terminés, chats courts)
+        const incompleteSessions = sessions.filter(session => {
+            if (session.generationType === 'qcm') {
+                const qcmSession = session as QcmSession;
+                return !qcmSession.userAnswers || Object.keys(qcmSession.userAnswers).length === 0;
+            }
+            if (session.generationType === 'chat') {
+                const chatSession = session as ChatSession;
+                return chatSession.messages.length <= 2; // Chats avec peu de messages
+            }
+            if (session.generationType === 'guided_study') {
+                const guidedSession = session as GuidedStudySession;
+                return guidedSession.currentStep < 3; // Études guidées non terminées
+            }
+            return false;
+        });
+        
+        // Sessions avec les meilleurs scores
+        const topScoringSessions = sessions
+            .filter(s => s.generationType === 'qcm')
+            .map(s => s as QcmSession)
+            .filter(s => s.score > 0)
+            .sort((a, b) => {
+                const aScore = a.score / a.quizData.questions.length;
+                const bScore = b.score / b.quizData.questions.length;
+                return bScore - aScore;
+            })
+            .slice(0, 3);
+        
+        return {
+            totalSessions: sessions.length,
+            recentSessions: recentSessions.length,
+            monthlySessions: monthlySessions.length,
+            typeStats,
+            incompleteSessions: incompleteSessions.slice(0, 5), // Top 5 sessions inachevées
+            topScoringSessions,
+            mostUsedType: Object.entries(typeStats).sort(([,a], [,b]) => (b as number) - (a as number))[0]?.[0] || 'qcm'
+        };
+    }, [sessions]);
     
     const displaySessions = sessions
         .filter(session => 
-            session && session.id && session.title && session.createdAt && // Vérifier que la session est valide
+            session && session.id && session.title && session.createdAt &&
             (session.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
             session.generationType.toLowerCase().includes(searchTerm.toLowerCase()))
         )
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) // Tri par date décroissante
-        .slice(0, showAllHistory ? sessions.length : 5); // Augmenté à 5 pour inclure plus de sessions
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, showAllHistory ? sessions.length : 5);
 
-    // Fonction helper pour formater le type de génération
     const formatGenerationType = (type: string) => {
         return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     };
-
-    const filteredSessions = sessions.filter(session =>
-        session.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        session.documentText.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-
 
     const SessionIcon = ({ type }: { type: Session['generationType'] }) => {
         const icons: { [key in Session['generationType']]: React.ReactNode } = {
@@ -2427,20 +2838,223 @@ const MainMenuSection: React.FC<MainMenuSectionProps> = ({
         return <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-slate-100 flex items-center justify-center">{icons[type] || null}</div>;
     };
 
+    const getTypeColor = (type: string) => {
+        const colors: { [key: string]: string } = {
+            'qcm': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
+            'summary': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
+            'chat': 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200',
+            'revision_sheet': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+            'mind_map': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+            'guided_study': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+        };
+        return colors[type] || 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200';
+    };
+
+    const handleStartRename = (session: Session) => {
+        setEditingSessionId(session.id);
+        setEditingTitle(session.title);
+    };
+
+    const handleSaveRename = async () => {
+        if (editingSessionId && editingTitle.trim()) {
+            await onRenameSession(editingSessionId, editingTitle.trim());
+            setEditingSessionId(null);
+            setEditingTitle('');
+        }
+    };
+
+    const handleCancelRename = () => {
+        setEditingSessionId(null);
+        setEditingTitle('');
+    };
+
     return (
-                        <div className="p-4 sm:p-6 animate__animated animate__fadeIn h-full">
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6 h-full">
-                {/* Panneau 1: Historique */}
-                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-4 border border-slate-200 dark:border-slate-600 flex flex-col">
+        <div className="p-4 pt-4 pb-6 animate__animated animate__fadeIn h-full flex flex-col min-h-0" style={{ height: 'calc(100vh - 70px)', minHeight: 'calc(100vh - 70px)' }}>
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 sm:gap-4 h-full min-h-0 flex-1" style={{ height: '100%', minHeight: '100%' }}>
+                {/* Panneau 1: Statistiques et Vue d'ensemble */}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-3 border border-slate-200 dark:border-slate-600 flex flex-col h-full min-h-0">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+                                <BrainCircuitIcon className="h-6 w-6 text-white" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-800 dark:text-white">Tableau de bord</h2>
+                                <div className="flex items-center gap-2">
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        Bienvenue, {userProfile?.firstName || 'Utilisateur'} !
+                                    </p>
+                                    {!userProfile?.firstName && (
+                                        <button
+                                            onClick={() => {
+                                                const firstName = prompt('Entrez votre prénom :');
+                                                if (firstName && firstName.trim()) {
+                                                    onUpdateUserProfile(firstName.trim());
+                                                }
+                                            }}
+                                            className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 underline"
+                                            title="Définir votre prénom"
+                                        >
+                                            Modifier
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        const timestamp = new Date().toISOString().split('T')[0];
+                                        const filename = `axonium_dashboard_${timestamp}`;
+                                        
+                                        await exportService.exportDashboardData(
+                                            sessions as Session[],
+                                            userPreferences,
+                                            [], // templates - à implémenter si nécessaire
+                                            userProfile || {},
+                                            currentUser.uid,
+                                            dashboardStats,
+                                            filename
+                                        );
+                                        
+                                        // Notification de succès
+                                        if (typeof window !== 'undefined' && (window as any).showNotification) {
+                                            (window as any).showNotification(
+                                                'Export réussi',
+                                                'Votre tableau de bord a été exporté en PDF avec succès.',
+                                                'success'
+                                            );
+                                        }
+                                    } catch (error) {
+                                        console.error('Erreur lors de l\'export du tableau de bord:', error);
+                                        if (typeof window !== 'undefined' && (window as any).showNotification) {
+                                            (window as any).showNotification(
+                                                'Erreur d\'export',
+                                                'Une erreur est survenue lors de l\'export du tableau de bord.',
+                                                'error'
+                                            );
+                                        }
+                                    }
+                                }}
+                                className="flex items-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors duration-200"
+                                title="Exporter le tableau de bord en PDF"
+                            >
+                                <DownloadIcon className="h-4 w-4" />
+                                Exporter
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Statistiques rapides */}
+                    <div className="grid grid-cols-2 gap-3 mb-6">
+                        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-slate-700 dark:to-slate-600 rounded-xl p-3">
+                            <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                                {dashboardStats.totalSessions}
+                            </div>
+                            <div className="text-xs text-slate-600 dark:text-slate-300">Créations totales</div>
+                        </div>
+                        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-slate-700 dark:to-slate-600 rounded-xl p-3">
+                            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                                {dashboardStats.recentSessions}
+                            </div>
+                            <div className="text-xs text-slate-600 dark:text-slate-300">Créations cette semaine</div>
+                        </div>
+                    </div>
+
+                    {/* Types de contenu les plus utilisés */}
+                    <div className="mb-6">
+                        <h3 className="font-semibold text-slate-800 dark:text-white mb-3 text-sm">Types de contenu</h3>
+                        <div className="space-y-2">
+                            {Object.entries(dashboardStats.typeStats)
+                                .sort(([,a], [,b]) => (b as number) - (a as number))
+                                .slice(0, 4)
+                                .map(([type, count]) => (
+                                    <div key={type} className="flex items-center justify-between">
+                                                                    <div className="flex items-center gap-2">
+                                <SessionIcon type={type as Session['generationType']} />
+                                <span className="text-sm text-slate-700 dark:text-slate-300">
+                                    {type === 'qcm' ? 'QCM' : formatGenerationType(type)}
+                                </span>
+                            </div>
+                                        <span className="text-sm font-semibold text-slate-800 dark:text-white">
+                                            {count}
+                                        </span>
+                                    </div>
+                                ))}
+                        </div>
+                    </div>
+
+                    {/* Suggestions "Reprendre où vous en étiez" */}
+                    {dashboardStats.incompleteSessions.length > 0 && (
+                        <div className="mb-6">
+                            <h3 className="font-semibold text-slate-800 dark:text-white mb-3 text-sm flex items-center gap-2">
+                                <RotateCwIcon className="h-4 w-4 text-orange-500" />
+                                Reprendre où vous en étiez
+                            </h3>
+                            <div className="space-y-2">
+                                {dashboardStats.incompleteSessions.map((session) => (
+                                    <button
+                                        key={session.id}
+                                        onClick={() => onOpenSession(session)}
+                                        className="w-full text-left p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <SessionIcon type={session.generationType} />
+                                            <span className="text-sm font-medium text-slate-800 dark:text-white">
+                                                {session.title}
+                                            </span>
+                                        </div>
+                                        <div className="text-xs text-slate-600 dark:text-slate-400">
+                                            {formatGenerationType(session.generationType)} • 
+                                            {new Date(session.createdAt).toLocaleDateString('fr-FR')}
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Meilleurs scores */}
+                    {dashboardStats.topScoringSessions.length > 0 && (
+                        <div className="mb-6">
+                            <h3 className="font-semibold text-slate-800 dark:text-white mb-3 text-sm flex items-center gap-2">
+                                <CheckCircleIcon className="h-4 w-4 text-green-500" />
+                                Meilleurs scores
+                            </h3>
+                            <div className="space-y-2">
+                                {dashboardStats.topScoringSessions.map((session) => {
+                                    const scorePercentage = Math.round((session.score / session.quizData.questions.length) * 100);
+                                    return (
+                                        <div key={session.id} className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <SessionIcon type={session.generationType} />
+                                                <span className="text-sm font-medium text-slate-800 dark:text-white">
+                                                    {session.title}
+                                                </span>
+                                            </div>
+                                            <div className="text-xs text-slate-600 dark:text-slate-400">
+                                                Score: {session.score}/{session.quizData.questions.length} ({scorePercentage}%)
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Panneau 2: Créations récentes */}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-3 border border-slate-200 dark:border-slate-600 flex flex-col h-full min-h-0">
                     <div className="flex justify-between items-center mb-4">
                         <div className="flex items-center gap-3">
                             <HistoryIcon className="h-5 w-5 text-indigo-500" />
-                            <h2 className="text-lg font-bold text-slate-800 dark:text-white">Votre historique</h2>
+                            <h2 className="text-lg font-bold text-slate-800 dark:text-white">Créations récentes</h2>
                         </div>
                         {sessions.length > 3 && (
                             <button
                                 onClick={() => setShowAllHistory(!showAllHistory)}
-                                className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium"
+                                className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium text-sm"
                             >
                                 {showAllHistory ? 'Voir moins' : `Voir tout (${sessions.length})`}
                             </button>
@@ -2457,7 +3071,7 @@ const MainMenuSection: React.FC<MainMenuSectionProps> = ({
                                 type="search"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Rechercher dans votre historique..."
+                                placeholder="Rechercher dans vos créations..."
                                 className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow duration-200"
                             />
                         </div>
@@ -2465,7 +3079,7 @@ const MainMenuSection: React.FC<MainMenuSectionProps> = ({
 
                     {/* Sessions List */}
                     {sessions.length > 0 ? (
-                        <div className="space-y-2 flex-1 overflow-y-auto">
+                        <div className="space-y-2 flex-1 overflow-y-auto min-h-0 h-full">
                             {displaySessions.map((session, index) => {
                                 return (
                                     <div
@@ -2484,12 +3098,57 @@ const MainMenuSection: React.FC<MainMenuSectionProps> = ({
                                         <SessionIcon type={session.generationType} />
                                         <div className="flex-grow">
                                             <div className="flex items-center gap-2">
-                                                <h3 className="font-bold text-slate-800 dark:text-slate-300 leading-tight text-sm">{session.title}</h3>
-                                                {(session as any).isShared === true && (
-                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
-                                                        <Share2Icon className="h-2.5 w-2.5 mr-1" />
-                                                        Partagé
-                                                    </span>
+                                                {editingSessionId === session.id ? (
+                                                    <div 
+                                                        className="flex items-center gap-2 flex-1"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <input
+                                                            type="text"
+                                                            value={editingTitle}
+                                                            onChange={(e) => setEditingTitle(e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    handleSaveRename();
+                                                                } else if (e.key === 'Escape') {
+                                                                    handleCancelRename();
+                                                                }
+                                                            }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="flex-1 px-2 py-1 text-sm font-bold text-slate-800 dark:text-slate-300 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                            autoFocus
+                                                        />
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleSaveRename();
+                                                            }}
+                                                            className="p-1 text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900 rounded"
+                                                            title="Sauvegarder"
+                                                        >
+                                                            <CheckCircleIcon className="h-3 w-3" />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleCancelRename();
+                                                            }}
+                                                            className="p-1 text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900 rounded"
+                                                            title="Annuler"
+                                                        >
+                                                            <XIcon className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <h3 className="font-bold text-slate-800 dark:text-slate-300 leading-tight text-sm">{session.title}</h3>
+                                                        {(session as any).isShared === true && (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+                                                                <Share2Icon className="h-2.5 w-2.5 mr-1" />
+                                                                Partagé
+                                                            </span>
+                                                        )}
+                                                    </>
                                                 )}
                                             </div>
                                             <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -2510,6 +3169,16 @@ const MainMenuSection: React.FC<MainMenuSectionProps> = ({
                                                 aria-label="Partager la session"
                                             >
                                                 <Share2Icon className="h-4 w-4" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleStartRename(session);
+                                                }}
+                                                className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900 rounded-full transition-colors duration-200"
+                                                aria-label="Renommer la session"
+                                            >
+                                                <PenIcon className="h-4 w-4" />
                                             </button>
                                             {(session as any).isShared === true ? (
                                                 <button
@@ -2543,7 +3212,7 @@ const MainMenuSection: React.FC<MainMenuSectionProps> = ({
                         <div className="text-center py-8 border-2 border-dashed border-slate-200 dark:border-slate-600 rounded-lg">
                             <LayersIcon className="mx-auto h-8 w-8 text-slate-400" />
                             <h3 className="mt-2 text-base font-medium text-slate-800 dark:text-white">
-                                {sessions.length === 0 ? 'Aucune session trouvée' : 'Aucun résultat de recherche'}
+                                {sessions.length === 0 ? 'Aucune création trouvée' : 'Aucun résultat de recherche'}
                             </h3>
                             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                                 {sessions.length === 0 ? 'Commencez par générer votre premier contenu' : 'Essayez avec d\'autres termes'}
@@ -2552,79 +3221,141 @@ const MainMenuSection: React.FC<MainMenuSectionProps> = ({
                     )}
                 </div>
 
-                {/* Panneau 2: Génération de Contenu */}
-                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-slate-700 dark:to-slate-600 rounded-2xl shadow-lg p-4 border border-indigo-200 dark:border-slate-600 flex flex-col">
-                        <div className="text-center mb-4">
-                            <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-3">Génération de Contenu</h2>
-                            <button
-                                onClick={onNewGeneration}
-                                className="inline-flex items-center gap-2 bg-indigo-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 button-animate"
-                            >
-                                <SparklesIcon className="h-6 w-6" />
-                                Générer du contenu
-                            </button>
+                {/* Panneau 3: Génération de Contenu */}
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-slate-700 dark:to-slate-600 rounded-2xl shadow-lg p-3 border border-indigo-200 dark:border-slate-600 flex flex-col h-full min-h-0">
+                    <div className="text-center mb-4">
+                        <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-3">Génération de Contenu</h2>
+                        <button
+                            onClick={onNewGeneration}
+                            className="inline-flex items-center gap-2 bg-indigo-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 button-animate"
+                        >
+                            <SparklesIcon className="h-6 w-6" />
+                            Générer du contenu
+                        </button>
 
-                            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Créez des QCM, résumés, fiches et plus encore</p>
-                        </div>
-
-                        {/* Options de personnalisation rapide */}
-                        <div className="space-y-3 flex-1">
-                            <div className="bg-white dark:bg-slate-800 rounded-xl p-3 border border-indigo-100 dark:border-slate-600">
-                                <h3 className="font-semibold text-slate-800 dark:text-white mb-2 text-sm">Options rapides</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    <button 
-                                        onClick={onNewGeneration}
-                                        className="flex items-center gap-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-500 transition-all text-left"
-                                    >
-                                        <ClipboardListIcon className="h-5 w-5 text-indigo-500" />
-                                        <div>
-                                            <div className="font-medium text-slate-800 dark:text-white text-sm">QCM</div>
-                                            <div className="text-xs text-slate-500 dark:text-slate-400">Questions à choix multiples</div>
-                                        </div>
-                                    </button>
-                                    
-                                    <button 
-                                        onClick={onNewGeneration}
-                                        className="flex items-center gap-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-500 transition-all text-left"
-                                    >
-                                        <BookOpenIcon className="h-5 w-5 text-emerald-500" />
-                                        <div>
-                                            <div className="font-medium text-slate-800 dark:text-white text-sm">Résumé</div>
-                                            <div className="text-xs text-slate-500 dark:text-slate-400">Synthèse du contenu</div>
-                                        </div>
-                                    </button>
-                                    
-                                    <button 
-                                        onClick={onNewGeneration}
-                                        className="flex items-center gap-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-500 transition-all text-left"
-                                    >
-                                        <NotebookTextIcon className="h-5 w-5 text-purple-500" />
-                                        <div>
-                                            <div className="font-medium text-slate-800 dark:text-white text-sm">Fiche</div>
-                                            <div className="text-xs text-slate-500 dark:text-slate-400">Fiche de révision</div>
-                                        </div>
-                                    </button>
-                                    
-                                    <button 
-                                        onClick={onNewGeneration}
-                                        className="flex items-center gap-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-500 transition-all text-left"
-                                    >
-                                        <MessageSquareIcon className="h-5 w-5 text-sky-500" />
-                                        <div>
-                                            <div className="font-medium text-slate-800 dark:text-white text-sm">Chat</div>
-                                            <div className="text-xs text-slate-500 dark:text-slate-400">Discussion IA</div>
-                                        </div>
-                                    </button>
-                                    
-
-                                </div>
-                            </div>
-                        </div>
+                        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Créez des QCM, résumés, fiches et plus encore</p>
                     </div>
 
+                    {/* Options de personnalisation rapide */}
+                    <div className="space-y-3 flex-1 min-h-0">
+                        <div className="bg-white dark:bg-slate-800 rounded-xl p-3 border border-indigo-100 dark:border-slate-600">
+                            <h3 className="font-semibold text-slate-800 dark:text-white mb-2 text-sm">Options rapides</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <button 
+                                    onClick={() => {
+                                        onSetGenerationType('qcm');
+                                        onNewGeneration();
+                                    }}
+                                    className="flex items-center gap-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-500 transition-all text-left"
+                                >
+                                    <ClipboardListIcon className="h-5 w-5 text-indigo-500" />
+                                    <div>
+                                        <div className="font-medium text-slate-800 dark:text-white text-sm">QCM</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">Questions à choix multiples</div>
+                                    </div>
+                                </button>
+                                
+                                <button 
+                                    onClick={() => {
+                                        onSetGenerationType('summary');
+                                        onNewGeneration();
+                                    }}
+                                    className="flex items-center gap-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-500 transition-all text-left"
+                                >
+                                    <BookOpenIcon className="h-5 w-5 text-emerald-500" />
+                                    <div>
+                                        <div className="font-medium text-slate-800 dark:text-white text-sm">Résumé</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">Synthèse du contenu</div>
+                                    </div>
+                                </button>
+                                
+                                <button 
+                                    onClick={() => {
+                                        onSetGenerationType('revision_sheet');
+                                        onNewGeneration();
+                                    }}
+                                    className="flex items-center gap-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-500 transition-all text-left"
+                                >
+                                    <NotebookTextIcon className="h-5 w-5 text-purple-500" />
+                                    <div>
+                                        <div className="font-medium text-slate-800 dark:text-white text-sm">Fiche de révision</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">Résumé structuré</div>
+                                    </div>
+                                </button>
+                                
+                                <button 
+                                    onClick={() => {
+                                        onSetGenerationType('mind_map');
+                                        onNewGeneration();
+                                    }}
+                                    className="flex items-center gap-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-500 transition-all text-left"
+                                >
+                                    <MindMapIcon className="h-5 w-5 text-orange-500" />
+                                    <div>
+                                        <div className="font-medium text-slate-800 dark:text-white text-sm">Carte mentale</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">Organisation visuelle</div>
+                                    </div>
+                                </button>
+                                
+                                <button 
+                                    onClick={() => {
+                                        onSetGenerationType('chat');
+                                        onNewGeneration();
+                                    }}
+                                    className="flex items-center gap-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-500 transition-all text-left"
+                                >
+                                    <MessageSquareIcon className="h-5 w-5 text-sky-500" />
+                                    <div>
+                                        <div className="font-medium text-slate-800 dark:text-white text-sm">Chat</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">Discussion interactive</div>
+                                    </div>
+                                </button>
+                                
+                                <button 
+                                    onClick={() => {
+                                        onSetGenerationType('guided_study');
+                                        onNewGeneration();
+                                    }}
+                                    className="flex items-center gap-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-500 transition-all text-left"
+                                >
+                                    <GraduationCapIcon className="h-5 w-5 text-yellow-500" />
+                                    <div>
+                                        <div className="font-medium text-slate-800 dark:text-white text-sm">Étude guidée</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">Parcours complet</div>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
 
+                        {/* Suggestions basées sur l'utilisation */}
+                        {dashboardStats.mostUsedType && (
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-3 border border-blue-200 dark:border-blue-700">
+                                <h3 className="font-semibold text-slate-800 dark:text-white mb-2 text-sm flex items-center gap-2">
+                                    <InfoIcon className="h-4 w-4 text-blue-500" />
+                                    Suggestion
+                                </h3>
+                                <p className="text-xs text-slate-600 dark:text-slate-300 mb-2">
+                                    Vous utilisez souvent les {formatGenerationType(dashboardStats.mostUsedType).toLowerCase()}s. 
+                                    Essayez de créer un {dashboardStats.mostUsedType === 'qcm' ? 'résumé' : dashboardStats.mostUsedType === 'summary' ? 'QCM' : 'résumé'} pour varier vos méthodes d'apprentissage !
+                                </p>
+                                <button 
+                                    onClick={() => {
+                                        // Définir le type suggéré basé sur le type le plus utilisé
+                                        const suggestedType = dashboardStats.mostUsedType === 'qcm' ? 'summary' : 
+                                                           dashboardStats.mostUsedType === 'summary' ? 'qcm' : 'summary';
+                                        onSetGenerationType(suggestedType);
+                                        onNewGeneration();
+                                    }}
+                                    className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
+                                >
+                                    Créer maintenant →
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
+        </div>
     );
 };
 
@@ -2651,11 +3382,11 @@ const HistorySection: React.FC<HistorySectionProps> = ({ sessions, onNewSession,
                     <div className="p-4 sm:p-6 lg:p-8 animate__animated animate__fadeIn">
                 <div className="flex flex-col sm:flex-row justify-between items-center mb-4 sm:mb-6 gap-4">
                     <div className="flex items-center gap-3">
-                        <HistoryIcon className="h-6 w-6 sm:h-8 sm:w-8 text-indigo-500" />
-                        <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-800">Historique</h2>
+                        <BookOpenIcon className="h-6 w-6 sm:h-8 sm:w-8 text-indigo-500" />
+                        <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-800">Études</h2>
                     </div>
                     <button onClick={onNewSession} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-all duration-300 shadow-sm hover:shadow-md">
-                    <SparklesIcon className="h-5 w-5" />Nouvelle Génération
+                    <PlusIcon className="h-5 w-5" />Créer
                 </button>
             </div>
              <div className="relative mb-6">
@@ -2739,8 +3470,13 @@ interface DocumentInputSectionProps {
     onTemplateSelect: (template: Template) => void;
     onShowTemplateSelector: () => void;
     userPreferences: UserPreferences;
+    onOpenDocumentSelector?: () => void;
+    selectedDocument?: Document | null;
+    onClearSelectedDocument?: () => void;
+    showDocumentLibrary?: boolean;
+    onToggleDocumentLibrary?: () => void;
 }
-const DocumentInputSection: React.FC<DocumentInputSectionProps> = ({ text, setText, onGenerate, onPdfChange, onImageChange, isProcessing, processingMessage, error, setError, numQuestions, setNumQuestions, difficulty, setDifficulty, generationType, setGenerationType, onBack, onBackToMain, selectedTemplate, onTemplateSelect, onShowTemplateSelector, userPreferences }) => {
+const DocumentInputSection: React.FC<DocumentInputSectionProps> = ({ text, setText, onGenerate, onPdfChange, onImageChange, isProcessing, processingMessage, error, setError, numQuestions, setNumQuestions, difficulty, setDifficulty, generationType, setGenerationType, onBack, onBackToMain, selectedTemplate, onTemplateSelect, onShowTemplateSelector, userPreferences, onOpenDocumentSelector, selectedDocument, onClearSelectedDocument, showDocumentLibrary, onToggleDocumentLibrary }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -2755,7 +3491,8 @@ const DocumentInputSection: React.FC<DocumentInputSectionProps> = ({ text, setTe
     
     return (
         <div className="p-4 sm:p-6 lg:p-8 animate__animated animate__fadeIn">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-4">
+            {/* En-tête */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                 <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-800">Générer du contenu</h2>
                 <div className="flex items-center gap-3">
                     {onBack && (
@@ -2779,23 +3516,146 @@ const DocumentInputSection: React.FC<DocumentInputSectionProps> = ({ text, setTe
                 </div>
             </div>
             
-            {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
-                <span className="block sm:inline">{error}</span>
-                <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => setError(null)}>
-                    <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
-                </span>
-            </div>}
+            {/* Messages d'erreur */}
+            {error && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-6" role="alert">
+                    <span className="block sm:inline">{error}</span>
+                    <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => setError(null)}>
+                        <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+                    </span>
+                </div>
+            )}
             
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            {/* Options d'import */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-3 w-full bg-white border-2 border-dashed border-slate-300 rounded-lg p-6 text-slate-600 hover:border-indigo-500 hover:text-indigo-600 transition-colors duration-200">
-                    <UploadCloudIcon className="h-8 w-8"/> <div><h3 className="font-bold">Importer un PDF</h3><p className="text-sm">Extraction de texte automatique</p></div> <input type="file" ref={fileInputRef} onChange={onPdfChange} accept="application/pdf" className="hidden"/>
+                    <UploadCloudIcon className="h-8 w-8"/> 
+                    <div className="text-left">
+                        <h3 className="font-bold">Importer un PDF</h3>
+                        <p className="text-sm">Extraction de texte automatique</p>
+                    </div> 
+                    <input type="file" ref={fileInputRef} onChange={onPdfChange} accept="application/pdf" className="hidden"/>
                 </button>
-                 <button onClick={() => imageInputRef.current?.click()} className="flex items-center justify-center gap-3 w-full bg-white border-2 border-dashed border-slate-300 rounded-lg p-6 text-slate-600 hover:border-indigo-500 hover:text-indigo-600 transition-colors duration-200">
-                    <ImageIcon className="h-8 w-8"/> <div><h3 className="font-bold">Importer une Image</h3><p className="text-sm">Extrait le texte d'une photo</p></div> <input type="file" ref={imageInputRef} onChange={onImageChange} accept="image/png, image/jpeg, image/webp" className="hidden"/>
+                <button onClick={() => imageInputRef.current?.click()} className="flex items-center justify-center gap-3 w-full bg-white border-2 border-dashed border-slate-300 rounded-lg p-6 text-slate-600 hover:border-indigo-500 hover:text-indigo-600 transition-colors duration-200">
+                    <ImageIcon className="h-8 w-8"/> 
+                    <div className="text-left">
+                        <h3 className="font-bold">Importer une Image</h3>
+                        <p className="text-sm">Extrait le texte d'une photo</p>
+                    </div> 
+                    <input type="file" ref={imageInputRef} onChange={onImageChange} accept="image/png, image/jpeg, image/webp" className="hidden"/>
                 </button>
+                {onOpenDocumentSelector && (
+                    <button onClick={onOpenDocumentSelector} className="flex items-center justify-center gap-3 w-full bg-white border-2 border-dashed border-slate-300 rounded-lg p-6 text-slate-600 hover:border-indigo-500 hover:text-indigo-600 transition-colors duration-200">
+                        <BookOpenIcon className="h-8 w-8"/> 
+                        <div className="text-left">
+                            <h3 className="font-bold">Bibliothèque</h3>
+                            <p className="text-sm">Sélectionner un document</p>
+                        </div>
+                    </button>
+                )}
             </div>
 
-            <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Ou collez votre texte ici... (minimum 100 caractères)" className="w-full h-48 p-4 border border-slate-300 rounded-lg mb-4 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow duration-200" minLength={100} required disabled={isProcessing} aria-label="Zone de saisie de texte"></textarea>
+            {/* Contrôles de la bibliothèque */}
+            {onToggleDocumentLibrary && (
+                <div className="mb-6">
+                    <button 
+                        onClick={onToggleDocumentLibrary}
+                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                            showDocumentLibrary 
+                                ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                        }`}
+                    >
+                        <BookOpenIcon className="h-5 w-5" />
+                        <span>
+                            {showDocumentLibrary ? 'Masquer la bibliothèque' : 'Afficher la bibliothèque de documents'}
+                        </span>
+                    </button>
+                </div>
+            )}
+
+            {/* Document sélectionné */}
+            {selectedDocument && (
+                <div className="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                            <BookOpenIcon className="h-6 w-6 text-indigo-600" />
+                            <div>
+                                <h3 className="font-medium text-indigo-800">Document sélectionné: {selectedDocument.name}</h3>
+                                <p className="text-sm text-indigo-600">
+                                    {(selectedDocument.size / 1024 / 1024).toFixed(1)} MB • {selectedDocument.type.toUpperCase()}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => {
+                                onClearSelectedDocument?.();
+                                setText('');
+                            }}
+                            className="text-indigo-600 hover:text-indigo-800"
+                            title="Supprimer le document"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Section Bibliothèque de Documents */}
+            {showDocumentLibrary && onOpenDocumentSelector && (
+                <div className="mb-8">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                Bibliothèque de Documents
+                            </h3>
+                        </div>
+                        <div className="p-6">
+                            <DocumentLibrary
+                                onDocumentSelect={(document) => {
+                                    documentService.processDocument(document).then(result => {
+                                        setText(result.text);
+                                        onClearSelectedDocument?.();
+                                    }).catch(error => {
+                                        setError('Erreur lors du traitement du document');
+                                        console.error('Erreur de traitement:', error);
+                                    });
+                                }}
+                                className="h-[600px]"
+                                showUploader={false}
+                                onUploaderToggle={(show) => {
+                                    console.log('Toggle uploader appelé avec:', show);
+                                    // Afficher une notification pour confirmer que le bouton fonctionne
+                                    if (show) {
+                                        alert('Fonctionnalité d\'ajout de documents - En cours de développement !');
+                                    }
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* Section Saisie de Texte */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Saisie de Texte
+                    </h3>
+                </div>
+                <div className="p-6">
+                    <textarea 
+                        value={text} 
+                        onChange={(e) => setText(e.target.value)} 
+                        placeholder="Ou collez votre texte ici... (minimum 100 caractères)" 
+                        className="w-full h-48 p-4 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow duration-200 dark:bg-gray-700 dark:text-white resize-none" 
+                        minLength={100} 
+                        required 
+                        disabled={isProcessing} 
+                        aria-label="Zone de saisie de texte"
+                    />
+                </div>
+            </div>
 
             <div className="mb-6">
                 <div className="flex items-center justify-between mb-3">
@@ -3567,6 +4427,24 @@ const NotificationBell: React.FC<{
     onClearAll: () => void;
 }> = ({ notifications, showNotifications, onToggleNotifications, onMarkAsRead, onRemoveNotification, onClearAll }) => {
     const unreadCount = notifications.filter(n => !n.read).length;
+    const notificationRef = useRef<HTMLDivElement>(null);
+
+    // Fermer les notifications en cliquant à l'extérieur
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (showNotifications && notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+                onToggleNotifications();
+            }
+        };
+
+        if (showNotifications) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showNotifications, onToggleNotifications]);
     
     const getNotificationIcon = (type: Notification['type']) => {
         switch (type) {
@@ -3592,7 +4470,7 @@ const NotificationBell: React.FC<{
             </button>
 
             {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden">
+                <div ref={notificationRef} className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden">
                     <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-purple-50">
                         <div className="flex justify-between items-center">
                             <h3 className="font-bold text-slate-800">Notifications</h3>
@@ -3665,6 +4543,102 @@ const NotificationBell: React.FC<{
                     </div>
                 </div>
             )}
+        </div>
+    );
+};
+
+// --- Title Input Section Component ---
+interface TitleInputSectionProps {
+    title: string;
+    setTitle: (title: string) => void;
+    onConfirm: () => void;
+    onCancel: () => void;
+    generationType: GenerationInputType;
+}
+
+const TitleInputSection: React.FC<TitleInputSectionProps> = ({ 
+    title, 
+    setTitle, 
+    onConfirm, 
+    onCancel, 
+    generationType 
+}) => {
+    const formatGenerationType = (type: string) => {
+        if (type === 'qcm') {
+            return 'QCM';
+        }
+        return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    };
+
+    const getTypeIcon = (type: GenerationInputType) => {
+        const icons = {
+            'qcm': <ClipboardListIcon className="h-6 w-6 text-indigo-500" />,
+            'summary': <BookOpenIcon className="h-6 w-6 text-emerald-500" />,
+            'chat': <MessageSquareIcon className="h-6 w-6 text-sky-500" />,
+            'revision_sheet': <NotebookTextIcon className="h-6 w-6 text-purple-500" />,
+            'mind_map': <MindMapIcon className="h-6 w-6 text-orange-500" />,
+            'guided_study': <GraduationCapIcon className="h-6 w-6 text-yellow-500" />,
+        };
+        return icons[type];
+    };
+
+    return (
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4">
+            <div className="max-w-md w-full bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8 border border-slate-200 dark:border-slate-700">
+                <div className="text-center mb-8">
+                    <div className="flex justify-center mb-4">
+                        <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center">
+                            {getTypeIcon(generationType)}
+                        </div>
+                    </div>
+                    <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">
+                        Nommez votre création
+                    </h1>
+                    <p className="text-slate-600 dark:text-slate-400">
+                        Donnez un nom à votre {formatGenerationType(generationType).toLowerCase()}
+                    </p>
+                </div>
+
+                <div className="space-y-6">
+                    <div>
+                        <label htmlFor="title" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                            Nom de la création
+                        </label>
+                        <input
+                            type="text"
+                            id="title"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    onConfirm();
+                                } else if (e.key === 'Escape') {
+                                    onCancel();
+                                }
+                            }}
+                            className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-slate-700 dark:text-white transition-colors"
+                            placeholder="Entrez le nom de votre création..."
+                            autoFocus
+                        />
+                    </div>
+
+                    <div className="flex gap-3">
+                        <button
+                            onClick={onCancel}
+                            className="flex-1 px-4 py-3 text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-xl font-medium transition-colors"
+                        >
+                            Annuler
+                        </button>
+                        <button
+                            onClick={onConfirm}
+                            disabled={!title.trim()}
+                            className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium rounded-xl hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                            Créer
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
