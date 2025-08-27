@@ -120,8 +120,9 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     }
   };
 
-  const getFileIcon = (type: string): string => {
-    switch (type.toLowerCase()) {
+  const getFileIcon = (fileName: string): string => {
+    const extension = fileName.toLowerCase().split('.').pop() || '';
+    switch (extension) {
       case 'pdf':
         return '📄';
       case 'jpg':
